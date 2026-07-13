@@ -1,4 +1,5 @@
 services:
+  # Backend Node.js Web Service
   - type: web
     name: syncspace-backend
     env: node
@@ -19,7 +20,7 @@ services:
       - key: JWT_REFRESH_SECRET
         sync: false
       - key: CLIENT_URL
-        sync: false
+        value: https://syncspace-frontend.onrender.com
       - key: CLOUDINARY_CLOUD_NAME
         sync: false
       - key: CLOUDINARY_API_KEY
@@ -27,12 +28,24 @@ services:
       - key: CLOUDINARY_API_SECRET
         sync: false
       - key: SMTP_HOST
-        sync: false
+        value: smtp.gmail.com
       - key: SMTP_PORT
-        sync: false
+        value: 587
       - key: SMTP_USER
         sync: false
       - key: SMTP_PASS
         sync: false
       - key: SMTP_FROM
-        sync: false
+        value: "SyncSpace <noreply@syncspace.io>"
+
+  # Frontend React/Vite Static Site
+  - type: static
+    name: syncspace-frontend
+    rootDir: client
+    buildCommand: npm install && npm run build
+    staticPublishPath: dist
+    envVars:
+      - key: VITE_API_URL
+        value: https://syncspace-backend.onrender.com/api/v1
+      - key: VITE_SOCKET_URL
+        value: https://syncspace-backend.onrender.com
