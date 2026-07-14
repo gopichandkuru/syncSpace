@@ -23,10 +23,15 @@ const userSchema = new mongoose.Schema({
   },
 }, { timestamps: true });
 
+// Performance indexes
+userSchema.index({ email: 1 }, { unique: true }); // fast login/register lookup
+userSchema.index({ emailVerificationToken: 1 }, { sparse: true });
+userSchema.index({ passwordResetToken: 1 }, { sparse: true });
+
 
 userSchema.pre('save', async function (next) {
   if (!this.isModified('password')) return next();
-  this.password = await bcrypt.hash(this.password, 12);
+  this.password = await bcrypt.hash(this.password, 10); // 10 rounds: ~200ms vs 12 rounds: ~800ms on free-tier CPU
   next();
 });
 

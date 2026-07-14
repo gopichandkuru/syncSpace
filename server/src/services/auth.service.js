@@ -25,9 +25,9 @@ class AuthService {
     const verifyLink = `${process.env.CLIENT_URL}/verify-email/${verificationToken}`;
     const { subject, html } = emailTemplates.verifyEmail(user.name, verifyLink);
 
-    try {
-      await sendMail({ to: email, subject, html });
-    } catch (_) {}
+    // Fire-and-forget: do NOT await email — respond to user instantly
+    // SMTP failure must never block registration
+    sendMail({ to: email, subject, html }).catch(() => {});
 
     const accessToken = generateAccessToken({ id: user._id, role: user.role });
     const refreshToken = generateRefreshToken({ id: user._id });

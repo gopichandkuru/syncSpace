@@ -10,6 +10,10 @@ const connectDB = async () => {
   const options = {
     serverSelectionTimeoutMS: 5000,
     socketTimeoutMS: 45000,
+    // Connection pool: keep 2–10 connections warm, never reconnect per-request
+    minPoolSize: 2,
+    maxPoolSize: 10,
+    heartbeatFrequencyMS: 10000, // ping MongoDB every 10s to keep connections alive
   };
 
   try {

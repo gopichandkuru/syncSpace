@@ -25,6 +25,8 @@ services:
         value: 7d
       - key: CLIENT_URL
         value: https://syncspace-frontend-05u3.onrender.com
+      - key: APP_URL
+        value: https://syncspace-backend-44cl.onrender.com
       - key: CLOUDINARY_CLOUD_NAME
         sync: false
       - key: CLOUDINARY_API_KEY
