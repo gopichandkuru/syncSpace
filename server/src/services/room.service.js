@@ -128,7 +128,8 @@ class RoomService {
     const inviter = await User.findById(userId);
     const link = `${process.env.CLIENT_URL}/invite/${token}`;
     const { subject, html } = emailTemplates.roomInvitation(invitedUser?.name || email, room.name, inviter.name, link);
-    await sendMail({ to: email, subject, html });
+    // Fire-and-forget: invitation is saved regardless of email delivery
+    sendMail({ to: email, subject, html }).catch(() => {});
 
     return invitation;
   }
@@ -217,6 +218,27 @@ class RoomService {
       .populate('participants', 'name avatar')
       .sort({ startedAt: -1 })
       .limit(50);
+  }
+  
+  async leaveRoom(roomId, userId) {
+    const room = await Room.findById(roomId);
+    if (!room) throw new AppError('Room not found', 404);
+    if (room.owner.toString() === userId.toString()) {
+      throw new AppError('Owner cannot leave without transferring ownership or deleting the workspace', 400);
+    }
+    room.members = room.members.filter((m) => m.user.toString() !== userId.toString());
+    await room.save();
+    await User.findByIdAndUpdate(userId, { $pull: { rooms: roomId } });
+    await ActivityLog.create({ user: userId, room: roomId, action: 'member_left' });
+  }
+  async getPendingInvitations(userId) {
+    const user = await User.findById(userId).select('email');
+    if (!user) return [];
+    return Invitation.find({ invitedEmail: user.email, status: 'pending', expiresAt: { $gt: new Date() } })
+      .populate('room', 'name slug type')
+      .populate('invitedBy', 'name avatar')
+      .sort({ createdAt: -1 })
+      .limit(20);
   }
 }
 

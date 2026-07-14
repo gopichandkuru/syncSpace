@@ -18,6 +18,7 @@ import ResetPasswordPage from './pages/auth/ResetPasswordPage';
 import VerifyEmailPage from './pages/auth/VerifyEmailPage';
 import DashboardPage from './pages/DashboardPage';
 import RoomPage from './pages/RoomPage';
+import CollaboratePage from './pages/CollaboratePage';
 import WhiteboardPage from './pages/WhiteboardPage';
 import EditorPage from './pages/EditorPage';
 import ProfilePage from './pages/ProfilePage';
@@ -87,6 +88,7 @@ export default function App() {
               <Route path="/dashboard" element={<DashboardPage />} />
               <Route path="/profile" element={<ProfilePage />} />
               <Route path="/room/:slug" element={<RoomPage />} />
+              <Route path="/room/:slug/collaborate" element={<CollaboratePage />} />
               <Route path="/room/:slug/whiteboard" element={<WhiteboardPage />} />
               <Route path="/room/:slug/editor" element={<EditorPage />} />
               <Route path="/room/:slug/replay/:sessionId" element={<ReplayPage />} />

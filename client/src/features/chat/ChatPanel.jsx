@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { useChatStore } from '../../store/chatStore';
 import { useRoomStore } from '../../store/roomStore';
 import { useSocket } from '../../context/SocketContext';
+import { useAuthStore } from '../../store/authStore';
 import { chatService } from '../../services';
 import { TbSend, TbArrowBackUp, TbTrash, TbMoodSmile, TbCheck, TbChecks } from 'react-icons/tb';
 import EmojiPicker from 'emoji-picker-react';
@@ -10,7 +11,8 @@ import toast from 'react-hot-toast';
 export default function ChatPanel() {
   const { messages, setMessages, addMessage, removeMessage, typingUsers, reset } = useChatStore();
   const { currentRoom } = useRoomStore();
-  const { emitChatMessage, emitChatSeen, emitTypingStart, emitTypingStop, socket } = useSocket();
+  const { emitChatMessage, emitChatSeen, emitTypingStart, emitTypingStop } = useSocket();
+  const { user } = useAuthStore();
   const [content, setContent] = useState('');
   const [replyTo, setReplyTo] = useState(null);
   const [emojiOpen, setEmojiOpen] = useState(false);
@@ -35,7 +37,7 @@ export default function ChatPanel() {
     return () => {
       reset();
     };
-  }, [currentRoom, setMessages, emitChatSeen, reset]);
+  }, [currentRoom?._id]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -143,7 +145,7 @@ export default function ChatPanel() {
                       >
                         <TbArrowBackUp size={14} />
                       </button>
-                      {msg.sender._id === socket?.user?.id && (
+                      {(msg.sender._id === user?._id || msg.sender._id === user?.id) && (
                         <button
                           onClick={() => handleDelete(msg._id)}
                           className="p-1 text-surface-400 hover:text-red-400 rounded hover:bg-surface-800"

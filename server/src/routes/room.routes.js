@@ -8,6 +8,7 @@ router.use(protect);
 
 router.get('/', apiLimiter, roomController.getRooms);
 router.get('/my', roomController.getMyRooms);
+router.get('/invitations/pending', roomController.getPendingInvitations);
 router.post('/', roomController.createRoom);
 router.get('/slug/:slug', roomController.getRoomBySlug);
 router.get('/invite/:token', roomController.acceptInvitation);
@@ -19,6 +20,7 @@ router.delete('/:id/members/:userId', roomController.kickMember);
 router.post('/:id/transfer', roomController.transferOwnership);
 router.post('/:id/sessions', roomController.createSession);
 router.patch('/:id/sessions/:sessionId/end', roomController.endSession);
+router.post('/:id/leave', roomController.leaveRoom);
 router.get('/:id/sessions', roomController.getRoomSessions);
 
 module.exports = router;

@@ -37,6 +37,8 @@ export const roomService = {
   createSession: (id) => api.post(`/rooms/${id}/sessions`),
   endSession: (id, sessionId) => api.patch(`/rooms/${id}/sessions/${sessionId}/end`),
   getSessions: (id) => api.get(`/rooms/${id}/sessions`),
+  getPendingInvitations: () => api.get('/rooms/invitations/pending'),
+  leave: (id) => api.post(`/rooms/${id}/leave`),
 };
 
 export const chatService = {

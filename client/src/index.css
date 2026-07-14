@@ -26,6 +26,11 @@
   /* scrollbar */
   --scrollbar-thumb: #6366f1;
   --scrollbar-track: #e2e8f0;
+
+  /* sidebar active styles */
+  --sidebar-active-bg: rgba(79, 70, 229, 0.08);
+  --sidebar-active-text: #4f46e5;
+  --sidebar-active-border: rgba(79, 70, 229, 0.15);
 }
 
 /* ============================================================
@@ -51,6 +56,11 @@ html.dark {
 
   --scrollbar-thumb: #4f46e5;
   --scrollbar-track: #1e293b;
+
+  /* sidebar active styles */
+  --sidebar-active-bg: rgba(99, 102, 241, 0.1);
+  --sidebar-active-text: #818cf8;
+  --sidebar-active-border: rgba(99, 102, 241, 0.2);
 }
 
 /* ============================================================
@@ -236,4 +246,100 @@ html.dark {
   .glow-sm { box-shadow: 0 0 10px rgba(99, 102, 241, 0.2); }
   .no-scrollbar::-webkit-scrollbar { display: none; }
   .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+}
+
+/* ============================================================
+   LIGHT MODE OVERRIDES
+   Fix hardcoded `text-white` and related classes so they render
+   as dark slate text in light mode. Dark mode is unaffected.
+   ============================================================ */
+:root:not(.dark) {
+  /* text-white → near-black slate in light mode */
+  .text-white {
+    color: rgb(15 23 42) !important; /* slate-900 */
+  }
+
+  /* hover:text-white → dark text on hover in light mode */
+  .hover\:text-white:hover {
+    color: rgb(15 23 42) !important;
+  }
+
+  /* panel-tab-active has hardcoded #818cf8 (light indigo) — fine in dark,
+     but low contrast on light backgrounds. Switch to primary-600. */
+  .panel-tab-active {
+    color: #4f46e5 !important; /* primary-600 — readable on white */
+  }
+
+  /* surface-450 is not in the Tailwind scale; used for subtle muted text.
+     In light mode map it to slate-600 for legibility. */
+  .text-surface-450 {
+    color: rgb(71 85 105); /* slate-600 */
+  }
+
+  /* Badges: dark-only palette (900 bg / 300 text) → light equivalents */
+  .badge-primary {
+    @apply bg-primary-100 text-primary-700 border-primary-300/60;
+  }
+  .badge-success {
+    @apply bg-green-100 text-green-700 border-green-300/60;
+  }
+  .badge-warning {
+    @apply bg-yellow-100 text-yellow-700 border-yellow-300/60;
+  }
+  .badge-danger {
+    @apply bg-red-100 text-red-700 border-red-300/60;
+  }
+
+  /* Activity / chat avatar initials on primary-900/40 bg */
+  .bg-primary-900\/40 {
+    background-color: rgb(99 102 241 / 0.12) !important;
+  }
+
+  /* Inputs / selects with inline text-white (EditorPage, ReplayPage toolbars) */
+  input.text-white,
+  select.text-white {
+    color: rgb(15 23 42) !important;
+    background-color: rgb(var(--surface-800));
+  }
+
+  /* Scrollbar track keeps contrast */
+  --scrollbar-track: #e2e8f0;
+  --scrollbar-thumb: #6366f1;
+}
+
+/* Light mode flat selectors (non-nested to avoid Tailwind @apply issues) */
+:root:not(.dark) .text-primary-400 {
+  color: rgb(79 70 229) !important; /* primary-600 */
+}
+
+:root:not(.dark) .hover\:text-primary-300:hover {
+  color: rgb(55 48 163) !important; /* primary-800 */
+}
+
+/* Make sure hovered states inside group (e.g., room card title) stay dark/readable */
+:root:not(.dark) .group:hover .group-hover\:text-primary-400 {
+  color: rgb(79 70 229) !important; /* primary-600 */
+}
+
+:root:not(.dark) .group:hover .group-hover\:text-primary-300 {
+  color: rgb(55 48 163) !important; /* primary-800 */
+}
+
+/* Badge primary / general primary text styling in light mode */
+:root:not(.dark) .text-primary-300 {
+  color: rgb(79 70 229) !important; /* primary-600 */
+}
+
+/* Target active/clicked state of links/buttons/inputs so they become dark when clicked */
+:root:not(.dark) a:active,
+:root:not(.dark) button:active,
+:root:not(.dark) input:active,
+:root:not(.dark) select:active,
+:root:not(.dark) textarea:active {
+  color: rgb(15 23 42) !important; /* slate-900 */
+}
+
+/* Also, general link text if it uses primary color should have clear hover/active contrast */
+:root:not(.dark) a.text-primary-500:hover {
+  color: rgb(55 48 163) !important; /* primary-800 */
 }

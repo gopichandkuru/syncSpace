@@ -73,9 +73,9 @@ export default function Sidebar() {
               style={
                 isActive
                   ? {
-                      backgroundColor: 'rgba(99,102,241,0.1)',
-                      color: '#818cf8',
-                      borderColor: 'rgba(99,102,241,0.2)',
+                      backgroundColor: 'var(--sidebar-active-bg, rgba(99,102,241,0.1))',
+                      color: 'var(--sidebar-active-text, #818cf8)',
+                      borderColor: 'var(--sidebar-active-border, rgba(99,102,241,0.2))',
                     }
                   : {
                       color: 'rgb(var(--text-muted))',

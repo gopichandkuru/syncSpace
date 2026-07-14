@@ -1,7 +1,7 @@
 import { create } from 'zustand';
 
 export const useWhiteboardStore = create((set, get) => ({
-  tool: 'select',
+  tool: 'pen',
   color: '#6366f1',
   strokeWidth: 3,
   fontSize: 16,
@@ -32,6 +32,13 @@ export const useWhiteboardStore = create((set, get) => ({
     return { shapes: newShapes, history: newHistory, historyIndex: newHistory.length - 1, isDirty: true };
   }),
 
+  // Live mouse-move updates — no history commit (avoids history spam)
+  updateShapeNoHistory: (id, updates) => set((state) => {
+    const newShapes = state.shapes.map((s) => (s.id === id ? { ...s, ...updates } : s));
+    return { shapes: newShapes, isDirty: true };
+  }),
+
+  // Final update on mouseUp — commits to history
   updateShape: (id, updates) => set((state) => {
     const newShapes = state.shapes.map((s) => (s.id === id ? { ...s, ...updates } : s));
     const newHistory = state.history.slice(0, state.historyIndex + 1);
@@ -48,10 +55,17 @@ export const useWhiteboardStore = create((set, get) => ({
 
   applyRemoteEvent: (event) => set((state) => {
     let newShapes = [...state.shapes];
-    if (event.type === 'add') newShapes.push(event.shape);
-    else if (event.type === 'update') newShapes = newShapes.map((s) => (s.id === event.shape.id ? event.shape : s));
-    else if (event.type === 'delete') newShapes = newShapes.filter((s) => !(event.ids || []).includes(s.id));
-    else if (event.type === 'clear') newShapes = [];
+    if (event.type === 'add') {
+      if (!newShapes.find((s) => s.id === event.shape.id)) newShapes.push(event.shape);
+    } else if (event.type === 'update') {
+      newShapes = newShapes.map((s) => (s.id === event.shape.id ? event.shape : s));
+    } else if (event.type === 'delete') {
+      newShapes = newShapes.filter((s) => !(event.ids || []).includes(s.id));
+    } else if (event.type === 'clear') {
+      newShapes = [];
+    } else if (event.type === 'set_state') {
+      newShapes = event.shapes || [];
+    }
     return { shapes: newShapes };
   }),
 

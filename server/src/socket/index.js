@@ -143,6 +143,8 @@ function initializeSocket(server) {
         roomData.whiteboardState = roomData.whiteboardState.filter((s) => !(event.ids || []).includes(s.id));
       } else if (event.type === 'clear') {
         roomData.whiteboardState = [];
+      } else if (event.type === 'set_state') {
+        roomData.whiteboardState = event.shapes || [];
       }
 
       roomData.replayBuffer.push({

@@ -5,7 +5,7 @@ import { useRoomStore } from '../store/roomStore';
 import { useAuthStore } from '../store/authStore';
 import InviteMemberModal from '../components/room/InviteMemberModal';
 import RoomSettingsModal from '../components/room/RoomSettingsModal';
-import { TbBrush, TbCode, TbUserPlus, TbSettings, TbHistory, TbUsers, TbTrash, TbShare, TbCrown } from 'react-icons/tb';
+import { TbBrush, TbCode, TbUserPlus, TbSettings, TbHistory, TbUsers, TbTrash, TbCrown, TbLayoutColumns, TbLink, TbCopy } from 'react-icons/tb';
 import toast from 'react-hot-toast';
 
 export default function RoomPage() {
@@ -18,6 +18,26 @@ export default function RoomPage() {
   const [sessions, setSessions] = useState([]);
   const [inviteOpen, setInviteOpen] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const [copying, setCopying] = useState(false);
+
+  const handleCopyInviteLink = () => {
+    const link = `${window.location.origin}/room/${slug}/collaborate`;
+    navigator.clipboard.writeText(link);
+    setCopying(true);
+    setTimeout(() => setCopying(false), 2000);
+    toast.success('Room link copied!');
+  };
+
+  const handleLeaveRoom = async () => {
+    if (!window.confirm('Are you sure you want to leave this workspace?')) return;
+    try {
+      await roomService.leave(currentRoom._id);
+      toast.success('You have left the workspace.');
+      navigate('/dashboard');
+    } catch (err) {
+      toast.error(err.response?.data?.message || 'Failed to leave workspace.');
+    }
+  };
 
   useEffect(() => {
     const fetchRoomData = async () => {
@@ -107,16 +127,20 @@ export default function RoomPage() {
         </div>
 
         <div className="flex flex-wrap items-center gap-3">
-          {(currentRoom.activeMode === 'both' || currentRoom.activeMode === 'whiteboard') && (
-            <button onClick={() => handleStartSession('whiteboard')} className="btn-primary">
-              <TbBrush size={18} />
-              <span>Go to Whiteboard</span>
-            </button>
-          )}
-          {(currentRoom.activeMode === 'both' || currentRoom.activeMode === 'editor') && (
-            <button onClick={() => handleStartSession('editor')} className="btn-secondary">
-              <TbCode size={18} />
-              <span>Go to Code Editor</span>
+          <button
+            onClick={() => navigate(`/room/${slug}/collaborate`)}
+            className="btn-primary"
+          >
+            <TbLayoutColumns size={18} />
+            <span>Open Space</span>
+          </button>
+          <button onClick={handleCopyInviteLink} className="btn-secondary" title="Copy room link">
+            {copying ? <TbCopy size={18} /> : <TbLink size={18} />}
+            <span className="hidden sm:inline">{copying ? 'Copied!' : 'Copy Link'}</span>
+          </button>
+          {!isOwner && (
+            <button onClick={handleLeaveRoom} className="btn-danger">
+              Leave Space
             </button>
           )}
           {isOwner && (

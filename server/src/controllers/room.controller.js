@@ -71,8 +71,19 @@ const getRoomSessions = catchAsync(async (req, res) => {
   res.json({ success: true, data: { sessions } });
 });
 
+const leaveRoom = catchAsync(async (req, res) => {
+  await roomService.leaveRoom(req.params.id, req.user.id);
+  res.json({ success: true, message: 'Left workspace successfully' });
+});
+
+const getPendingInvitations = catchAsync(async (req, res) => {
+  const invitations = await roomService.getPendingInvitations(req.user.id);
+  res.json({ success: true, data: { invitations } });
+});
+
 module.exports = {
   createRoom, getRooms, getMyRooms, getRoomById, getRoomBySlug,
   updateRoom, deleteRoom, inviteMember, acceptInvitation,
   kickMember, transferOwnership, createSession, endSession, getRoomSessions,
+  leaveRoom, getPendingInvitations,
 };
