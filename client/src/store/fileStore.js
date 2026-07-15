@@ -55,4 +55,10 @@ export const useFileStore = create((set, get) => ({
       throw err;
     }
   },
+
+  addFile: (file) => set((state) => {
+    // avoid duplicates
+    if (state.files.find(f => f._id === file._id)) return state;
+    return { files: [file, ...state.files] };
+  }),
 }));

@@ -419,7 +419,7 @@ export default function CollaboratePage() {
         {meetingParticipants.some(p => p.isSharingScreen) && (
           <FeatureBoundary name="ScreenShareViewer">
             <div className="absolute inset-0 z-40 bg-black">
-              <ScreenShareViewer stream={meetingParticipants.find(p => p.isSharingScreen)?.stream} />
+              <ScreenShareViewer stream={meetingParticipants.find(p => p.isSharingScreen)?.screenStream} />
             </div>
           </FeatureBoundary>
         )}

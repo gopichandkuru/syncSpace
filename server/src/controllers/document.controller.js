@@ -45,7 +45,14 @@ exports.createDocument = catchAsync(async (req, res, next) => {
     versions: docContent ? [{ content: docContent, savedBy: req.user.id }] : []
   });
 
-  res.status(201).json({ status: 'success', data: { document } });
+  const populatedDoc = await document.populate('creator', 'name avatar');
+
+  const io = req.app.get('io');
+  if (io) {
+    io.to(roomId).emit('document:created', { document: populatedDoc });
+  }
+
+  res.status(201).json({ status: 'success', data: { document: populatedDoc } });
 });
 
 exports.getRoomDocuments = catchAsync(async (req, res, next) => {

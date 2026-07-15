@@ -6,6 +6,9 @@ import { useChatStore } from '../store/chatStore';
 import { useNotificationStore } from '../store/notificationStore';
 import { usePresenceStore } from '../store/notificationStore';
 import { useWhiteboardStore } from '../store/whiteboardStore';
+import { useMeetingStore } from '../store/meetingStore';
+import { useDocumentStore } from '../store/documentStore';
+import { useFileStore } from '../store/fileStore';
 import toast from 'react-hot-toast';
 
 const SOCKET_URL = import.meta.env.VITE_SOCKET_URL || 'http://localhost:5000';
@@ -22,6 +25,7 @@ const EVENTS = {
   EDITOR_YJS_AWARENESS: 'editor:yjs:awareness', EDITOR_LANGUAGE_CHANGE: 'editor:language_change',
   CHAT_MESSAGE: 'chat:message', CHAT_MESSAGE_DELETED: 'chat:message_deleted', CHAT_SEEN: 'chat:seen',
   NOTIFICATION: 'notification',
+  DOCUMENT_CREATED: 'document:created', FILE_CREATED: 'file:created'
 };
 
 export function SocketProvider({ children }) {
@@ -50,10 +54,27 @@ export function SocketProvider({ children }) {
     socket.on('disconnect', () => { setIsConnected(false); });
     socket.on('connect_error', (err) => { console.error('Socket error:', err.message); });
 
-    socket.on(EVENTS.ROOM_JOINED, ({ room, members, whiteboardState }) => {
+    socket.on(EVENTS.ROOM_JOINED, ({ room, members, whiteboardState, chatHistory, activeMeetingParticipants, activeScreenSharers }) => {
       setMembers(members);
       if (whiteboardState?.length) {
         useWhiteboardStore.getState().setInitialState(whiteboardState);
+      }
+      if (chatHistory?.length) {
+        useChatStore.getState().setMessages(chatHistory);
+      }
+      if (activeMeetingParticipants?.length) {
+        activeMeetingParticipants.forEach((id) => {
+          if (id !== useAuthStore.getState().user?.id) {
+            useMeetingStore.getState().addParticipant({ id });
+          }
+        });
+      }
+      if (activeScreenSharers?.length) {
+        activeScreenSharers.forEach((id) => {
+          if (id !== useAuthStore.getState().user?.id) {
+            useMeetingStore.getState().addParticipant({ id, isSharingScreen: true });
+          }
+        });
       }
     });
 
@@ -74,6 +95,14 @@ export function SocketProvider({ children }) {
     socket.on(EVENTS.NOTIFICATION, (n) => {
       addNotification(n);
       if (n.type !== 'cursor') toast(n.message, { icon: '🔔', duration: 3000 });
+    });
+
+    socket.on(EVENTS.DOCUMENT_CREATED, ({ document }) => {
+      useDocumentStore.getState().addDocument(document);
+    });
+
+    socket.on(EVENTS.FILE_CREATED, ({ file }) => {
+      useFileStore.getState().addFile(file);
     });
 
     return () => { socket.disconnect(); socketRef.current = null; setIsConnected(false); };
@@ -146,7 +175,7 @@ export function SocketProvider({ children }) {
       emitScreenShareStart: (roomId) => socketRef.current?.emit('screen_share:start', { roomId }),
       emitScreenShareStop: (roomId) => socketRef.current?.emit('screen_share:stop', { roomId }),
       emitUserActivityChange: (roomId, activity) => socketRef.current?.emit('user:activity_change', { roomId, activity }),
-      emitWebRTCSignal: (targetUserId, signal) => socketRef.current?.emit('webrtc:signal', { targetUserId, signal }),
+      emitWebRTCSignal: (targetUserId, signal, isScreen = false) => socketRef.current?.emit('webrtc:signal', { targetUserId, signal, isScreen }),
       onYjsSync, onYjsUpdate, onYjsAwareness, onLanguageChange, onCursorMove,
       EVENTS,
     }}>

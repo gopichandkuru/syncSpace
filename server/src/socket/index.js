@@ -13,6 +13,15 @@ const replayService = require('../services/replay.service');
 
 // In-memory: roomId -> { doc, awareness, whiteboardState, connectedUsers, sessionId, replayBuffer }
 const roomDocs = new Map();
+// In-memory: docId -> Y.Doc
+const documentDocs = new Map();
+
+function getOrCreateDocYjs(docId) {
+  if (!documentDocs.has(docId)) {
+    documentDocs.set(docId, new Y.Doc());
+  }
+  return documentDocs.get(docId);
+}
 
 function getOrCreateRoomDoc(roomId) {
   if (!roomDocs.has(roomId)) {
@@ -23,8 +32,11 @@ function getOrCreateRoomDoc(roomId) {
       awareness,
       whiteboardState: [],
       connectedUsers: new Map(),
+      meetingParticipants: new Set(),
+      screenSharers: new Set(),
       sessionId: null,
       replayBuffer: [],
+      isInitializedFromDB: false,
     });
   }
   return roomDocs.get(roomId);
@@ -77,15 +89,37 @@ function initializeSocket(server) {
         socket.currentSession = sessionId || null;
 
         const roomData = getOrCreateRoomDoc(roomId);
+        
+        // Initialize from DB if first time
+        if (!roomData.isInitializedFromDB) {
+          if (room.whiteboardState && Array.isArray(room.whiteboardState)) {
+            roomData.whiteboardState = room.whiteboardState;
+          }
+          if (room.yjsState) {
+            try {
+              Y.applyUpdate(roomData.doc, new Uint8Array(room.yjsState));
+            } catch (err) {
+              console.error('Error applying yjs state from DB:', err);
+            }
+          }
+          roomData.isInitializedFromDB = true;
+        }
+
         roomData.connectedUsers.set(socket.id, { ...socket.user, socketId: socket.id, joinedAt: Date.now() });
         if (sessionId) roomData.sessionId = sessionId;
 
         const members = Array.from(roomData.connectedUsers.values());
+        
+        // Fetch recent chat history
+        const recentMessages = await chatService.getMessages(roomId, socket.user.id, { limit: 50 });
 
         socket.emit(EVENTS.ROOM_JOINED, {
           room: { _id: room._id, name: room.name, slug: room.slug, type: room.type, activeMode: room.activeMode, settings: room.settings },
           members,
           whiteboardState: roomData.whiteboardState,
+          chatHistory: recentMessages,
+          activeMeetingParticipants: Array.from(roomData.meetingParticipants),
+          activeScreenSharers: Array.from(roomData.screenSharers),
         });
 
         // Send Yjs state
@@ -206,6 +240,49 @@ function initializeSocket(server) {
       });
     });
 
+    // ── Document Yjs Editor ───────────────────────────────────────
+    socket.on('document:yjs:sync', ({ roomId, docId, type, data }) => {
+      const room = socket.currentRoom || roomId;
+      const doc = getOrCreateDocYjs(docId);
+      const uint8 = new Uint8Array(data);
+
+      if (type === 'sv') {
+        const encoder = encoding.createEncoder();
+        syncProtocol.writeSyncStep2(encoder, doc, uint8);
+        const reply = encoding.toUint8Array(encoder);
+        if (reply.length > 1) {
+          socket.emit('document:yjs:sync', { docId, type: 'update', data: Array.from(reply) });
+        }
+      } else if (type === 'update') {
+        try { Y.applyUpdate(doc, uint8); } catch {}
+        socket.to(room).emit('document:yjs:sync', { docId, type: 'update', data });
+      }
+    });
+
+    socket.on('document:yjs:update', ({ roomId, docId, update }) => {
+      const room = socket.currentRoom || roomId;
+      const doc = getOrCreateDocYjs(docId);
+      try { Y.applyUpdate(doc, new Uint8Array(update)); } catch {}
+      socket.to(room).emit('document:yjs:update', { docId, update, userId: socket.user.id });
+    });
+
+    // ── Document Annotations ──────────────────────────────────────
+    socket.on('document:annot:sync', ({ roomId, docId }) => {
+      const room = socket.currentRoom || roomId;
+      const roomData = getOrCreateRoomDoc(room);
+      if (!roomData.docAnnotations) roomData.docAnnotations = {};
+      socket.emit('document:annot:sync', { docId, annotations: roomData.docAnnotations[docId] || {} });
+    });
+
+    socket.on('document:annot:update', ({ roomId, docId, pageNum, annotations }) => {
+      const room = socket.currentRoom || roomId;
+      const roomData = getOrCreateRoomDoc(room);
+      if (!roomData.docAnnotations) roomData.docAnnotations = {};
+      if (!roomData.docAnnotations[docId]) roomData.docAnnotations[docId] = {};
+      roomData.docAnnotations[docId][pageNum] = annotations;
+      socket.to(room).emit('document:annot:update', { docId, pageNum, newAnnotations: annotations, userId: socket.user.id });
+    });
+
     // ── Chat ───────────────────────────────────────────────────────
     socket.on(EVENTS.CHAT_MESSAGE, async ({ roomId, content, type, replyTo }) => {
       try {
@@ -222,7 +299,7 @@ function initializeSocket(server) {
     });
 
     // ── WebRTC Signaling ───────────────────────────────────────────
-    socket.on(EVENTS.WEBRTC_SIGNAL, ({ targetUserId, signal }) => {
+    socket.on('webrtc:signal', ({ targetUserId, signal, isScreen }) => {
       const room = socket.currentRoom;
       if (!room) return;
       const roomData = roomDocs.get(room);
@@ -236,28 +313,45 @@ function initializeSocket(server) {
         }
       }
       if (targetSocketId) {
-        io.to(targetSocketId).emit(EVENTS.WEBRTC_SIGNAL, {
+        io.to(targetSocketId).emit('webrtc:signal', {
           senderUserId: socket.user.id,
-          signal
+          signal,
+          isScreen
         });
       }
     });
 
     // ── Meetings & Activity ────────────────────────────────────────
     socket.on(EVENTS.MEETING_JOIN, ({ roomId }) => {
-      socket.to(roomId || socket.currentRoom).emit(EVENTS.MEETING_JOIN, { userId: socket.user.id, name: socket.user.name });
+      const room = roomId || socket.currentRoom;
+      if (room && roomDocs.has(room)) {
+        roomDocs.get(room).meetingParticipants.add(socket.user.id);
+      }
+      socket.to(room).emit(EVENTS.MEETING_JOIN, { userId: socket.user.id, name: socket.user.name });
     });
 
     socket.on(EVENTS.MEETING_LEAVE, ({ roomId }) => {
-      socket.to(roomId || socket.currentRoom).emit(EVENTS.MEETING_LEAVE, { userId: socket.user.id });
+      const room = roomId || socket.currentRoom;
+      if (room && roomDocs.has(room)) {
+        roomDocs.get(room).meetingParticipants.delete(socket.user.id);
+      }
+      socket.to(room).emit(EVENTS.MEETING_LEAVE, { userId: socket.user.id });
     });
 
     socket.on(EVENTS.SCREEN_SHARE_START, ({ roomId }) => {
-      socket.to(roomId || socket.currentRoom).emit(EVENTS.SCREEN_SHARE_START, { userId: socket.user.id, name: socket.user.name });
+      const room = roomId || socket.currentRoom;
+      if (room && roomDocs.has(room)) {
+        roomDocs.get(room).screenSharers.add(socket.user.id);
+      }
+      socket.to(room).emit(EVENTS.SCREEN_SHARE_START, { userId: socket.user.id, name: socket.user.name });
     });
 
     socket.on(EVENTS.SCREEN_SHARE_STOP, ({ roomId }) => {
-      socket.to(roomId || socket.currentRoom).emit(EVENTS.SCREEN_SHARE_STOP, { userId: socket.user.id });
+      const room = roomId || socket.currentRoom;
+      if (room && roomDocs.has(room)) {
+        roomDocs.get(room).screenSharers.delete(socket.user.id);
+      }
+      socket.to(room).emit(EVENTS.SCREEN_SHARE_STOP, { userId: socket.user.id });
     });
 
     socket.on(EVENTS.USER_ACTIVITY_CHANGE, ({ roomId, activity }) => {
@@ -296,6 +390,8 @@ function leaveRoom(socket, io) {
   const roomData = roomDocs.get(room);
   if (roomData) {
     roomData.connectedUsers.delete(socket.id);
+    roomData.meetingParticipants.delete(socket.user?.id);
+    roomData.screenSharers.delete(socket.user?.id);
     const members = Array.from(roomData.connectedUsers.values());
     socket.to(room).emit(EVENTS.USER_OFFLINE, { userId: socket.user?.id, members });
     socket.to(room).emit(EVENTS.NOTIFICATION, {
@@ -304,12 +400,24 @@ function leaveRoom(socket, io) {
       userId: socket.user?.id,
     });
     if (roomData.connectedUsers.size === 0) {
-      setTimeout(() => {
+      setTimeout(async () => {
         const current = roomDocs.get(room);
         if (current && current.connectedUsers.size === 0) {
-          flushReplayBuffer(room, current).finally(() => roomDocs.delete(room));
+          try {
+            // Persist state to DB before destroying
+            const yjsState = Buffer.from(Y.encodeStateAsUpdate(current.doc));
+            await Room.findByIdAndUpdate(room, {
+              whiteboardState: current.whiteboardState,
+              yjsState: yjsState
+            });
+            await flushReplayBuffer(room, current);
+          } catch (err) {
+            console.error('Error persisting room state:', err);
+          } finally {
+            roomDocs.delete(room);
+          }
         }
-      }, 5 * 60 * 1000);
+      }, 5 * 60 * 1000); // 5 minutes grace period
     }
   }
   socket.leave(room);

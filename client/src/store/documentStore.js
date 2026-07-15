@@ -67,4 +67,10 @@ export const useDocumentStore = create((set, get) => ({
   },
 
   setCurrentDocument: (doc) => set({ currentDocument: doc }),
+  
+  addDocument: (doc) => set((state) => {
+    // avoid duplicates
+    if (state.documents.find(d => d._id === doc._id)) return state;
+    return { documents: [doc, ...state.documents] };
+  }),
 }));

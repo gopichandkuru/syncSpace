@@ -32,7 +32,14 @@ exports.uploadFile = catchAsync(async (req, res, next) => {
     mimetype: req.file.mimetype,
   });
 
-  res.status(201).json({ status: 'success', data: { file } });
+  const populatedFile = await file.populate('uploader', 'name avatar');
+
+  const io = req.app.get('io');
+  if (io) {
+    io.to(roomId).emit('file:created', { file: populatedFile });
+  }
+
+  res.status(201).json({ status: 'success', data: { file: populatedFile } });
 });
 
 exports.getRoomFiles = catchAsync(async (req, res, next) => {

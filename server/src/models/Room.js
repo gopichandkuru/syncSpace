@@ -24,6 +24,8 @@ const roomSchema = new mongoose.Schema({
     enableChat: { type: Boolean, default: true },
     enableReplay: { type: Boolean, default: true },
   },
+  whiteboardState: { type: mongoose.Schema.Types.Mixed, default: [] },
+  yjsState: { type: Buffer, default: null },
   thumbnail: { type: String, default: null },
   lastActivity: { type: Date, default: Date.now },
 }, { timestamps: true });

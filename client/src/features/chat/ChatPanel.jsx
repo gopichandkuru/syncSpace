@@ -22,17 +22,8 @@ export default function ChatPanel() {
   useEffect(() => {
     if (!currentRoom) return;
 
-    const loadMessages = async () => {
-      try {
-        const res = await chatService.getMessages(currentRoom._id);
-        setMessages(res.data.data.messages || []);
-        emitChatSeen(currentRoom._id);
-      } catch (err) {
-        toast.error('Failed to load chat history.');
-      }
-    };
-
-    loadMessages();
+    // Chat history is now loaded via ROOM_JOINED socket event in SocketContext
+    emitChatSeen(currentRoom._id);
 
     return () => {
       reset();
