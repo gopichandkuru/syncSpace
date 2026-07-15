@@ -24,7 +24,6 @@ const userSchema = new mongoose.Schema({
 }, { timestamps: true });
 
 // Performance indexes
-userSchema.index({ email: 1 }, { unique: true }); // fast login/register lookup
 userSchema.index({ emailVerificationToken: 1 }, { sparse: true });
 userSchema.index({ passwordResetToken: 1 }, { sparse: true });
 
