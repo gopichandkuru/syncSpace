@@ -45,6 +45,18 @@ const SOCKET_EVENTS = {
 
   // Replay
   REPLAY_EVENT: 'replay:event',
+
+  // WebRTC Signaling
+  WEBRTC_SIGNAL: 'webrtc:signal',
+  
+  // Meeting
+  MEETING_JOIN: 'meeting:join',
+  MEETING_LEAVE: 'meeting:leave',
+  
+  // Activity / Status
+  USER_ACTIVITY_CHANGE: 'user:activity_change',
+  SCREEN_SHARE_START: 'screen_share:start',
+  SCREEN_SHARE_STOP: 'screen_share:stop',
 };
 
 module.exports = SOCKET_EVENTS;

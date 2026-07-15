@@ -5,7 +5,9 @@ import { useRoomStore } from '../store/roomStore';
 import { useAuthStore } from '../store/authStore';
 import InviteMemberModal from '../components/room/InviteMemberModal';
 import RoomSettingsModal from '../components/room/RoomSettingsModal';
-import { TbBrush, TbCode, TbUserPlus, TbSettings, TbHistory, TbUsers, TbTrash, TbCrown, TbLayoutColumns, TbLink, TbCopy } from 'react-icons/tb';
+import DocumentList from '../features/documents/DocumentList';
+import FileList from '../features/files/FileList';
+import { TbBrush, TbCode, TbUserPlus, TbSettings, TbHistory, TbUsers, TbTrash, TbCrown, TbLayoutColumns, TbLink, TbCopy, TbFileText, TbFolder } from 'react-icons/tb';
 import toast from 'react-hot-toast';
 
 export default function RoomPage() {
@@ -19,6 +21,7 @@ export default function RoomPage() {
   const [inviteOpen, setInviteOpen] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [copying, setCopying] = useState(false);
+  const [activeTab, setActiveTab] = useState('overview'); // overview, documents, files
 
   const handleCopyInviteLink = () => {
     const link = `${window.location.origin}/room/${slug}/collaborate`;
@@ -153,8 +156,31 @@ export default function RoomPage() {
         </div>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-        {/* Workspace Members list */}
+      {/* Tabs */}
+      <div className="flex items-center gap-2 border-b border-surface-800 pb-px">
+        <button 
+          onClick={() => setActiveTab('overview')} 
+          className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors ${activeTab === 'overview' ? 'border-primary-500 text-primary-400' : 'border-transparent text-surface-400 hover:text-white'}`}
+        >
+          Overview
+        </button>
+        <button 
+          onClick={() => setActiveTab('documents')} 
+          className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors flex items-center gap-2 ${activeTab === 'documents' ? 'border-primary-500 text-primary-400' : 'border-transparent text-surface-400 hover:text-white'}`}
+        >
+          <TbFileText size={16} /> Documents
+        </button>
+        <button 
+          onClick={() => setActiveTab('files')} 
+          className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors flex items-center gap-2 ${activeTab === 'files' ? 'border-primary-500 text-primary-400' : 'border-transparent text-surface-400 hover:text-white'}`}
+        >
+          <TbFolder size={16} /> Files
+        </button>
+      </div>
+
+      {activeTab === 'overview' && (
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+          {/* Workspace Members list */}
         <div className="space-y-4 lg:col-span-1">
           <div className="flex items-center justify-between">
             <h2 className="text-xl font-bold text-white flex items-center gap-2">
@@ -248,8 +274,17 @@ export default function RoomPage() {
           </div>
         </div>
       </div>
+      )}
 
-      {isOwner && (
+      {activeTab === 'documents' && (
+        <DocumentList roomId={currentRoom._id} isOwner={isOwner} slug={slug} />
+      )}
+
+      {activeTab === 'files' && (
+        <FileList roomId={currentRoom._id} isOwner={isOwner} />
+      )}
+
+      {isOwner && activeTab === 'overview' && (
         <div className="card border-red-900/30 bg-red-950/5 p-6 flex flex-col md:flex-row md:items-center justify-between gap-4">
           <div>
             <h3 className="font-bold text-red-400">Danger Zone</h3>

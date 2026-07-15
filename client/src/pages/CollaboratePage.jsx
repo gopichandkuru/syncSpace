@@ -8,9 +8,15 @@ import { roomService } from '../services';
 import WhiteboardPanel from '../features/whiteboard/WhiteboardPanel';
 import EditorPanel from '../features/editor/EditorPanel';
 import ChatPanel from '../features/chat/ChatPanel';
+import DocumentPanel from '../features/documents/DocumentPanel';
+import MeetingManager from '../features/meeting/MeetingManager';
+import MeetingOverlay from '../features/meeting/MeetingOverlay';
+import ScreenShareViewer from '../features/meeting/ScreenShareViewer';
+import { useMeetingStore } from '../store/meetingStore';
+import { useSearchParams } from 'react-router-dom';
 import {
   TbChevronLeft, TbUsers, TbMessage, TbLayoutColumns, TbBrush, TbCode,
-  TbGripVertical, TbWifi, TbWifiOff,
+  TbGripVertical, TbWifi, TbWifiOff, TbVideoPlus, TbPhoneOff, TbScreenShare, TbScreenShareOff
 } from 'react-icons/tb';
 import toast from 'react-hot-toast';
 
@@ -19,13 +25,17 @@ export default function CollaboratePage() {
   const navigate = useNavigate();
   const { currentRoom, currentSession, setCurrentRoom, setCurrentSession, setMembers, members } = useRoomStore();
   const { chatOpen, setChatOpen } = useUIStore();
-  const { joinRoom, leaveRoom, isConnected } = useSocket();
+  const { socket, joinRoom, leaveRoom, isConnected, emitMeetingJoin, emitMeetingLeave, emitScreenShareStart, emitScreenShareStop } = useSocket();
+  const { isInMeeting, isScreenSharing, setMeetingState, clearMeeting, meetingParticipants } = useMeetingStore();
+  const [searchParams] = useSearchParams();
+  const docId = searchParams.get('doc');
 
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [layout, setLayout] = useState('both'); // 'both' | 'whiteboard' | 'editor'
   const [dividerX, setDividerX] = useState(50); // percent
   const [dragging, setDragging] = useState(false);
+  const [activities, setActivities] = useState({}); // { userId: 'activity_string' }
   const containerRef = useRef(null);
   const joinedRef = useRef(false); // prevent double-join
 
@@ -138,6 +148,86 @@ export default function CollaboratePage() {
     };
   }, [dragging]);
 
+  useEffect(() => {
+    if (!socket) return;
+    
+    const handleActivity = ({ userId, activity }) => {
+      setActivities(prev => ({ ...prev, [userId]: activity }));
+      
+      // Auto clear after 5s if it's not a continuous state
+      if (['editing_doc', 'drawing', 'typing_code'].includes(activity)) {
+        setTimeout(() => {
+          setActivities(prev => {
+            if (prev[userId] === activity) {
+              const newAct = { ...prev };
+              delete newAct[userId];
+              return newAct;
+            }
+            return prev;
+          });
+        }, 5000);
+      }
+    };
+    
+    const handleMeetingJoin = ({ userId }) => setActivities(prev => ({ ...prev, [userId]: 'in_meeting' }));
+    const handleMeetingLeave = ({ userId }) => setActivities(prev => { const n = {...prev}; delete n[userId]; return n; });
+    const handleScreenShareStart = ({ userId }) => setActivities(prev => ({ ...prev, [userId]: 'sharing_screen' }));
+    const handleScreenShareStop = ({ userId }) => setActivities(prev => ({ ...prev, [userId]: 'in_meeting' }));
+
+    socket.on('user:activity_change', handleActivity);
+    socket.on('meeting:join', handleMeetingJoin);
+    socket.on('meeting:leave', handleMeetingLeave);
+    socket.on('screen_share:start', handleScreenShareStart);
+    socket.on('screen_share:stop', handleScreenShareStop);
+
+    return () => {
+      socket.off('user:activity_change', handleActivity);
+      socket.off('meeting:join', handleMeetingJoin);
+      socket.off('meeting:leave', handleMeetingLeave);
+      socket.off('screen_share:start', handleScreenShareStart);
+      socket.off('screen_share:stop', handleScreenShareStop);
+    };
+  }, [socket]);
+
+  // ── Meeting & Screen Share Actions ───────────────────────────────────────
+  const handleToggleMeeting = async () => {
+    if (isInMeeting) {
+      emitMeetingLeave(currentRoom?._id);
+      clearMeeting();
+    } else {
+      try {
+        const stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
+        setMeetingState({ isInMeeting: true, localStream: stream });
+        emitMeetingJoin(currentRoom?._id);
+      } catch (err) {
+        toast.error('Microphone/Camera access denied.');
+      }
+    }
+  };
+
+  const handleToggleScreenShare = async () => {
+    if (isScreenSharing) {
+      const { localScreenStream } = useMeetingStore.getState();
+      localScreenStream?.getTracks().forEach(track => track.stop());
+      setMeetingState({ isScreenSharing: false, localScreenStream: null });
+      emitScreenShareStop(currentRoom?._id);
+    } else {
+      try {
+        const stream = await navigator.mediaDevices.getDisplayMedia({ video: true });
+        setMeetingState({ isScreenSharing: true, localScreenStream: stream });
+        emitScreenShareStart(currentRoom?._id);
+        
+        // Listen for user stopping via browser UI
+        stream.getVideoTracks()[0].onended = () => {
+          setMeetingState({ isScreenSharing: false, localScreenStream: null });
+          emitScreenShareStop(currentRoom?._id);
+        };
+      } catch (err) {
+        toast.error('Screen sharing cancelled.');
+      }
+    }
+  };
+
   // ── Loading screen ───────────────────────────────────────────────────────
   if (loading) {
     return (
@@ -226,8 +316,29 @@ export default function CollaboratePage() {
           </button>
         </div>
 
+        {/* Meeting & Screen Share */}
+        <div className="flex items-center gap-1 ml-2 pl-2 border-l border-surface-700">
+          <button
+            onClick={handleToggleMeeting}
+            className={`px-2 py-1.5 rounded text-xs flex items-center gap-1.5 font-medium transition-colors ${isInMeeting ? 'bg-red-500/20 text-red-400 hover:bg-red-500/30' : 'bg-surface-800 text-green-400 hover:bg-surface-700'}`}
+          >
+            {isInMeeting ? <TbPhoneOff size={14} /> : <TbVideoPlus size={14} />}
+            <span className="hidden sm:inline">{isInMeeting ? 'Leave' : 'Join'}</span>
+          </button>
+          
+          {isInMeeting && (
+            <button
+              onClick={handleToggleScreenShare}
+              className={`px-2 py-1.5 rounded text-xs flex items-center gap-1.5 font-medium transition-colors ${isScreenSharing ? 'bg-red-500/20 text-red-400 hover:bg-red-500/30' : 'bg-surface-800 text-blue-400 hover:bg-surface-700'}`}
+            >
+              {isScreenSharing ? <TbScreenShareOff size={14} /> : <TbScreenShare size={14} />}
+              <span className="hidden sm:inline">{isScreenSharing ? 'Stop Share' : 'Share'}</span>
+            </button>
+          )}
+        </div>
+
         {/* Online members */}
-        <div className="ml-auto flex items-center gap-2">
+        <div className="ml-auto flex items-center gap-2 relative group">
           <div className="flex items-center gap-1 text-xs text-surface-400">
             <TbUsers size={14} />
             <span>{onlineCount} online</span>
@@ -235,11 +346,12 @@ export default function CollaboratePage() {
           <div className="flex -space-x-2">
             {safeMembers.slice(0, 5).map((m) => {
               const u = m.user || m;
+              const act = activities[u._id || u.id];
               return (
                 <div
                   key={u._id || u.id || Math.random()}
-                  title={u.name}
-                  className="w-7 h-7 rounded-full bg-primary-800 border-2 border-surface-900 flex items-center justify-center text-white text-xs font-bold flex-shrink-0"
+                  title={`${u.name} ${act ? `(${act.replace('_', ' ')})` : ''}`}
+                  className={`w-7 h-7 rounded-full border-2 border-surface-900 flex items-center justify-center text-white text-xs font-bold flex-shrink-0 ${act ? 'ring-2 ring-primary-500' : 'bg-primary-800'}`}
                 >
                   {u.avatar ? <img src={u.avatar} alt={u.name} className="w-full h-full rounded-full object-cover" /> : u.name?.charAt(0)?.toUpperCase()}
                 </div>
@@ -249,6 +361,24 @@ export default function CollaboratePage() {
               <div className="w-7 h-7 rounded-full bg-surface-700 border-2 border-surface-900 flex items-center justify-center text-xs text-surface-300 font-bold">
                 +{safeMembers.length - 5}
               </div>
+            )}
+          </div>
+          
+          {/* Live Activity Tooltip */}
+          <div className="absolute top-full right-0 mt-2 bg-surface-800 border border-surface-700 rounded-lg p-2 shadow-xl hidden group-hover:block z-50 w-48">
+            <h4 className="text-xs font-semibold text-surface-300 mb-2">Live Activities</h4>
+            {Object.keys(activities).length === 0 ? (
+              <p className="text-xs text-surface-500">No active collaboration</p>
+            ) : (
+              Object.entries(activities).map(([uid, act]) => {
+                const user = safeMembers.find(m => (m.user?._id || m.user?.id) === uid)?.user;
+                return user ? (
+                  <div key={uid} className="text-xs flex items-center justify-between mb-1">
+                    <span className="truncate max-w-[100px] text-white">{user.name}</span>
+                    <span className="text-primary-400 capitalize">{act.replace('_', ' ')}</span>
+                  </div>
+                ) : null;
+              })
             )}
           </div>
 
@@ -264,7 +394,21 @@ export default function CollaboratePage() {
       </div>
 
       {/* ── Main Area ─────────────────────────────────────────────────── */}
-      <div className="flex flex-1 overflow-hidden" ref={containerRef}>
+      <div className="flex flex-1 overflow-hidden relative" ref={containerRef}>
+        
+        <MeetingManager />
+        <MeetingOverlay roomId={currentRoom?._id} />
+
+        {/* Screen Share Viewer (Full screen in this pane if someone is sharing, ignoring normal layout) */}
+        {/* We would need to detect if remote screen sharing is active. For now, we only show local layout. 
+            If a participant is sharing their screen, we could render it instead of the editor.
+            Let's keep it simple: if there is a screen share stream in participants, show it. */}
+        {meetingParticipants.some(p => p.isSharingScreen) && (
+           <div className="absolute inset-0 z-40 bg-black">
+             <ScreenShareViewer stream={meetingParticipants.find(p => p.isSharingScreen).stream} />
+           </div>
+        )}
+
         {/* Whiteboard Panel */}
         {(layout === 'both' || layout === 'whiteboard') && (
           <div
@@ -288,13 +432,13 @@ export default function CollaboratePage() {
           </div>
         )}
 
-        {/* Editor Panel */}
+        {/* Editor or Document Panel */}
         {(layout === 'both' || layout === 'editor') && (
           <div
             className="flex-1 overflow-hidden border-l border-surface-800"
             style={{ width: layout === 'both' ? `${100 - dividerX}%` : '100%' }}
           >
-            <EditorPanel />
+            {docId ? <DocumentPanel /> : <EditorPanel />}
           </div>
         )}
 

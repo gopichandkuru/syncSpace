@@ -221,6 +221,49 @@ function initializeSocket(server) {
       chatService.markSeen(roomId || socket.currentRoom, socket.user.id).catch(() => {});
     });
 
+    // ── WebRTC Signaling ───────────────────────────────────────────
+    socket.on(EVENTS.WEBRTC_SIGNAL, ({ targetUserId, signal }) => {
+      const room = socket.currentRoom;
+      if (!room) return;
+      const roomData = roomDocs.get(room);
+      if (!roomData) return;
+      
+      let targetSocketId = null;
+      for (const [sId, user] of roomData.connectedUsers.entries()) {
+        if (user.id === targetUserId) {
+          targetSocketId = sId;
+          break;
+        }
+      }
+      if (targetSocketId) {
+        io.to(targetSocketId).emit(EVENTS.WEBRTC_SIGNAL, {
+          senderUserId: socket.user.id,
+          signal
+        });
+      }
+    });
+
+    // ── Meetings & Activity ────────────────────────────────────────
+    socket.on(EVENTS.MEETING_JOIN, ({ roomId }) => {
+      socket.to(roomId || socket.currentRoom).emit(EVENTS.MEETING_JOIN, { userId: socket.user.id, name: socket.user.name });
+    });
+
+    socket.on(EVENTS.MEETING_LEAVE, ({ roomId }) => {
+      socket.to(roomId || socket.currentRoom).emit(EVENTS.MEETING_LEAVE, { userId: socket.user.id });
+    });
+
+    socket.on(EVENTS.SCREEN_SHARE_START, ({ roomId }) => {
+      socket.to(roomId || socket.currentRoom).emit(EVENTS.SCREEN_SHARE_START, { userId: socket.user.id, name: socket.user.name });
+    });
+
+    socket.on(EVENTS.SCREEN_SHARE_STOP, ({ roomId }) => {
+      socket.to(roomId || socket.currentRoom).emit(EVENTS.SCREEN_SHARE_STOP, { userId: socket.user.id });
+    });
+
+    socket.on(EVENTS.USER_ACTIVITY_CHANGE, ({ roomId, activity }) => {
+      socket.to(roomId || socket.currentRoom).emit(EVENTS.USER_ACTIVITY_CHANGE, { userId: socket.user.id, activity });
+    });
+
     // ── Disconnect ─────────────────────────────────────────────────
     socket.on('disconnect', async () => {
       console.log(`🔌 Disconnected: ${socket.user?.name}`);

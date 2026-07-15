@@ -12,6 +12,8 @@ const userRoutes = require('./routes/user.routes');
 const roomRoutes = require('./routes/room.routes');
 const chatRoutes = require('./routes/chat.routes');
 const replayRoutes = require('./routes/replay.routes');
+const documentRoutes = require('./routes/document.routes');
+const fileRoutes = require('./routes/file.routes');
 
 const app = express();
 
@@ -57,6 +59,8 @@ app.use('/api/v1/users', userRoutes);
 app.use('/api/v1/rooms', roomRoutes);
 app.use('/api/v1/chat', chatRoutes);
 app.use('/api/v1/replay', replayRoutes);
+app.use('/api/v1/documents', documentRoutes);
+app.use('/api/v1/files', fileRoutes);
 
 app.use(notFound);
 app.use(errorHandler);
