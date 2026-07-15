@@ -26,7 +26,7 @@ const EXT = { javascript: 'js', typescript: 'ts', python: 'py', java: 'java', cp
 export default function EditorPanel() {
   const { currentRoom, currentSession } = useRoomStore();
   const { language, setLanguage, theme: editorTheme, setTheme: setEditorTheme, fontSize, setFontSize } = useEditorStore();
-  const { emitYjsSync, emitYjsUpdate, emitLanguageChange, onYjsSync, onYjsUpdate, onLanguageChange, isConnected, emitTypingStart, emitTypingStop } = useSocket();
+  const { emitEditorSync, emitEditorUpdate, emitLanguageChange, onYjsSync, onYjsUpdate, onLanguageChange, isConnected, emitTypingStart, emitTypingStop } = useSocket();
 
   const [editorValue, setEditorValue] = useState('// Start coding here...\n');
   const [saveStatus, setSaveStatus] = useState('saved'); // 'saving' | 'saved'
@@ -54,14 +54,14 @@ export default function EditorPanel() {
 
     // Send state vector to server to get full state
     const stateVector = Y.encodeStateVector(doc);
-    emitYjsSync(currentRoom._id, 'sv', Array.from(stateVector));
+    emitEditorSync(currentRoom._id, 'sv', Array.from(stateVector));
 
     const handleLocalUpdate = (update, origin) => {
       if (origin !== 'socket' && isConnected) {
         setSaveStatus('saving');
         clearTimeout(saveTimer.current);
         saveTimer.current = setTimeout(() => setSaveStatus('saved'), 1500);
-        emitYjsUpdate(currentRoom._id, Array.from(update));
+        emitEditorUpdate(currentRoom._id, Array.from(update));
       }
     };
     doc.on('update', handleLocalUpdate);
