@@ -7,8 +7,49 @@ import { useRoomStore } from '../../store/roomStore';
 export default function MeetingManager() {
   const { socket, emitWebRTCSignal } = useSocket();
   const { currentRoom } = useRoomStore();
-  const { isInMeeting, localStream, localScreenStream, isScreenSharing } = useMeetingStore();
-  
+  const {
+    isInMeeting,
+    localStream,
+    setLocalStream,
+    localScreenStream,
+    setLocalScreenStream,
+    addParticipant,
+    removeParticipant,
+    isScreenSharing
+  } = useMeetingStore();
+
+  function createPeer(targetUserId, incomingSignal, stream, initiator = false, isScreen = false) {
+    const peer = new Peer({
+      initiator,
+      trickle: false,
+      stream,
+    });
+
+    peer.on('signal', signal => {
+      if (emitWebRTCSignal) {
+        emitWebRTCSignal(targetUserId, signal, isScreen);
+      }
+    });
+
+    peer.on('stream', userStream => {
+      if (isScreen) {
+        useMeetingStore.getState().addParticipant({ id: targetUserId, screenStream: userStream, isSharingScreen: true });
+      } else {
+        useMeetingStore.getState().addParticipant({ id: targetUserId, stream: userStream });
+      }
+    });
+
+    peer.on('error', err => {
+      console.warn(`Peer error (${isScreen ? 'screen' : 'video'}):`, err);
+    });
+
+    if (incomingSignal) {
+      peer.signal(incomingSignal);
+    }
+
+    return peer;
+  }
+
   const peersRef = useRef({});
   const screenPeersRef = useRef({});
 
@@ -120,38 +161,6 @@ export default function MeetingManager() {
       }
     }
   }, [isInMeeting, localStream, localScreenStream]);
-
-  const createPeer = (targetUserId, incomingSignal, stream, initiator = false, isScreen = false) => {
-    const peer = new Peer({
-      initiator,
-      trickle: false,
-      stream,
-    });
-
-    peer.on('signal', signal => {
-      if (emitWebRTCSignal) {
-        emitWebRTCSignal(targetUserId, signal, isScreen);
-      }
-    });
-
-    peer.on('stream', userStream => {
-      if (isScreen) {
-        useMeetingStore.getState().addParticipant({ id: targetUserId, screenStream: userStream, isSharingScreen: true });
-      } else {
-        useMeetingStore.getState().addParticipant({ id: targetUserId, stream: userStream });
-      }
-    });
-
-    peer.on('error', err => {
-      console.warn(`Peer error (${isScreen ? 'screen' : 'video'}):`, err);
-    });
-
-    if (incomingSignal) {
-      peer.signal(incomingSignal);
-    }
-
-    return peer;
-  };
 
   return null;
 }

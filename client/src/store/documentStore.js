@@ -1,7 +1,7 @@
 import { create } from 'zustand';
 import api from '../services/api';
 
-export const useDocumentStore = create((set, get) => ({
+export const useDocumentStore = create((set) => ({
   documents: [],
   currentDocument: null,
   loading: false,

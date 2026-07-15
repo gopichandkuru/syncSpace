@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 
-export const useRoomStore = create((set, get) => ({
+export const useRoomStore = create((set) => ({
   currentRoom: null,
   rooms: [],
   myRooms: [],

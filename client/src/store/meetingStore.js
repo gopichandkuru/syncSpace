@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 
-export const useMeetingStore = create((set, get) => ({
+export const useMeetingStore = create((set) => ({
   isInMeeting: false,
   isScreenSharing: false,
   meetingParticipants: [], // list of socket user objects with streams

@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 
-export const useWhiteboardStore = create((set, get) => ({
+export const useWhiteboardStore = create((set) => ({
   tool: 'pen',
   color: '#6366f1',
   strokeWidth: 3,

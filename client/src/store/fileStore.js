@@ -1,7 +1,7 @@
 import { create } from 'zustand';
 import api from '../services/api';
 
-export const useFileStore = create((set, get) => ({
+export const useFileStore = create((set) => ({
   files: [],
   loading: false,
   error: null,

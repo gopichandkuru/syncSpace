@@ -176,6 +176,8 @@ export function SocketProvider({ children }) {
       emitScreenShareStop: (roomId) => socketRef.current?.emit('screen_share:stop', { roomId }),
       emitUserActivityChange: (roomId, activity) => socketRef.current?.emit('user:activity_change', { roomId, activity }),
       emitWebRTCSignal: (targetUserId, signal, isScreen = false) => socketRef.current?.emit('webrtc:signal', { targetUserId, signal, isScreen }),
+      emitChatMessage,
+      emitChatSeen,
       onYjsSync, onYjsUpdate, onYjsAwareness, onLanguageChange, onCursorMove,
       EVENTS,
     }}>
