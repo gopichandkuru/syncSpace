@@ -11,7 +11,7 @@ import { useDocumentStore } from '../store/documentStore';
 import { useFileStore } from '../store/fileStore';
 import toast from 'react-hot-toast';
 
-const SOCKET_URL = import.meta.env.VITE_SOCKET_URL || 'http://localhost:5000';
+const SOCKET_URL = import.meta.env.VITE_SOCKET_URL || (import.meta.env.PROD ? 'https://syncspace-backend-44cl.onrender.com' : 'http://localhost:5005');
 
 const SocketContext = createContext(null);
 

@@ -2,7 +2,7 @@ import axios from 'axios';
 import { useAuthStore } from '../store/authStore';
 
 const api = axios.create({
-  baseURL: import.meta.env.VITE_API_URL || '/api/v1',
+  baseURL: import.meta.env.VITE_API_URL || (import.meta.env.PROD ? 'https://syncspace-backend-44cl.onrender.com/api/v1' : 'http://localhost:5005/api/v1'),
   withCredentials: true,
   headers: { 'Content-Type': 'application/json' },
 });
