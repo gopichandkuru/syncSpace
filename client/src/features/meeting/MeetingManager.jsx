@@ -75,7 +75,7 @@ export default function MeetingManager() {
     const handleMeetingJoin = ({ userId, name }) => {
       const { isInMeeting: freshIsInMeeting, localStream: freshLocalStream, isScreenSharing: freshSharing, localScreenStream: freshScreenStream } = useMeetingStore.getState();
       
-      if (freshIsInMeeting && freshLocalStream) {
+      if (freshIsInMeeting) {
         const peer = createPeer(userId, null, freshLocalStream, true, false);
         peersRef.current[userId] = peer;
         useMeetingStore.getState().addParticipant({ id: userId, name });
