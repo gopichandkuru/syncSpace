@@ -43,9 +43,22 @@ function getOrCreateRoomDoc(roomId) {
 }
 
 function initializeSocket(server) {
+  // Build allowed origins array (supports comma-separated CLIENT_URL for multi-origin)
+  const allowedOrigins = process.env.CLIENT_URL
+    ? process.env.CLIENT_URL.split(',').map((u) => u.trim())
+    : [];
+
   const io = new Server(server, {
     cors: {
-      origin: process.env.CLIENT_URL,
+      origin: function (origin, callback) {
+        // Allow server-to-server (no origin) or localhost in dev
+        if (!origin) return callback(null, true);
+        if (process.env.NODE_ENV !== 'production' && origin.startsWith('http://localhost')) {
+          return callback(null, true);
+        }
+        if (allowedOrigins.includes(origin)) return callback(null, true);
+        callback(new Error('Socket CORS: Not allowed by CORS'));
+      },
       credentials: true,
       methods: ['GET', 'POST'],
     },
@@ -341,7 +354,12 @@ function initializeSocket(server) {
     socket.on(EVENTS.SCREEN_SHARE_START, ({ roomId }) => {
       const room = roomId || socket.currentRoom;
       if (room && roomDocs.has(room)) {
-        roomDocs.get(room).screenSharers.add(socket.user.id);
+        const roomData = roomDocs.get(room);
+        // Only allow one screen sharer
+        if (roomData.screenSharers.size > 0 && !roomData.screenSharers.has(socket.user.id)) {
+          return socket.emit(EVENTS.ERROR, { message: 'Someone else is already sharing their screen.' });
+        }
+        roomData.screenSharers.add(socket.user.id);
       }
       socket.to(room).emit(EVENTS.SCREEN_SHARE_START, { userId: socket.user.id, name: socket.user.name });
     });
@@ -356,6 +374,21 @@ function initializeSocket(server) {
 
     socket.on(EVENTS.USER_ACTIVITY_CHANGE, ({ roomId, activity }) => {
       socket.to(roomId || socket.currentRoom).emit(EVENTS.USER_ACTIVITY_CHANGE, { userId: socket.user.id, activity });
+    });
+
+    // ── Live Preview Sync ─────────────────────────────────────────
+    // When any user runs or auto-updates the HTML preview,
+    // broadcast the rendered HTML to ALL participants in the room.
+    socket.on(EVENTS.PREVIEW_SYNC, ({ roomId, html, triggeredBy }) => {
+      const room = roomId || socket.currentRoom;
+      if (!room) return;
+      // Broadcast to everyone else in the room (not the sender)
+      socket.to(room).emit(EVENTS.PREVIEW_SYNC, {
+        html,
+        triggeredBy: triggeredBy || socket.user.id,
+        userName: socket.user.name,
+        timestamp: Date.now(),
+      });
     });
 
     // ── Disconnect ─────────────────────────────────────────────────
@@ -389,11 +422,23 @@ function leaveRoom(socket, io) {
   const room = socket.currentRoom;
   const roomData = roomDocs.get(room);
   if (roomData) {
+    const wasInMeeting = roomData.meetingParticipants.has(socket.user?.id);
+    const wasSharing = roomData.screenSharers.has(socket.user?.id);
+    
     roomData.connectedUsers.delete(socket.id);
     roomData.meetingParticipants.delete(socket.user?.id);
     roomData.screenSharers.delete(socket.user?.id);
+    
     const members = Array.from(roomData.connectedUsers.values());
     socket.to(room).emit(EVENTS.USER_OFFLINE, { userId: socket.user?.id, members });
+    
+    if (wasInMeeting) {
+      socket.to(room).emit(EVENTS.MEETING_LEAVE, { userId: socket.user?.id });
+    }
+    if (wasSharing) {
+      socket.to(room).emit(EVENTS.SCREEN_SHARE_STOP, { userId: socket.user?.id });
+    }
+    
     socket.to(room).emit(EVENTS.NOTIFICATION, {
       type: 'user_left',
       message: `${socket.user?.name} left the room`,

@@ -25,7 +25,8 @@ const EVENTS = {
   EDITOR_YJS_AWARENESS: 'editor:yjs:awareness', EDITOR_LANGUAGE_CHANGE: 'editor:language_change',
   CHAT_MESSAGE: 'chat:message', CHAT_MESSAGE_DELETED: 'chat:message_deleted', CHAT_SEEN: 'chat:seen',
   NOTIFICATION: 'notification',
-  DOCUMENT_CREATED: 'document:created', FILE_CREATED: 'file:created'
+  DOCUMENT_CREATED: 'document:created', FILE_CREATED: 'file:created',
+  PREVIEW_SYNC: 'preview:sync',
 };
 
 export function SocketProvider({ children }) {
@@ -167,6 +168,15 @@ export function SocketProvider({ children }) {
   const onLanguageChange = (cb) => { socketRef.current?.on(EVENTS.EDITOR_LANGUAGE_CHANGE, cb); return () => socketRef.current?.off(EVENTS.EDITOR_LANGUAGE_CHANGE, cb); };
   const onCursorMove = (cb) => { socketRef.current?.on(EVENTS.CURSOR_MOVE, cb); return () => socketRef.current?.off(EVENTS.CURSOR_MOVE, cb); };
 
+  // ── Preview Sync helpers ───────────────────────────────────────
+  const emitPreviewSync = (roomId, html) => {
+    socketRef.current?.emit(EVENTS.PREVIEW_SYNC, { roomId, html });
+  };
+  const onPreviewSync = (cb) => {
+    socketRef.current?.on(EVENTS.PREVIEW_SYNC, cb);
+    return () => socketRef.current?.off(EVENTS.PREVIEW_SYNC, cb);
+  };
+
   return (
     <SocketContext.Provider value={{
       socket: socketRef.current,
@@ -190,7 +200,9 @@ export function SocketProvider({ children }) {
       emitWebRTCSignal: (targetUserId, signal, isScreen = false) => socketRef.current?.emit('webrtc:signal', { targetUserId, signal, isScreen }),
       emitChatMessage,
       emitChatSeen,
+      emitPreviewSync,
       onYjsSync, onYjsUpdate, onYjsAwareness, onLanguageChange, onCursorMove,
+      onPreviewSync,
       EVENTS,
     }}>
       {children}

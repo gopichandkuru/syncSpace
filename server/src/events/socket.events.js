@@ -57,6 +57,9 @@ const SOCKET_EVENTS = {
   USER_ACTIVITY_CHANGE: 'user:activity_change',
   SCREEN_SHARE_START: 'screen_share:start',
   SCREEN_SHARE_STOP: 'screen_share:stop',
+
+  // Live Preview Sync
+  PREVIEW_SYNC: 'preview:sync',
 };
 
 module.exports = SOCKET_EVENTS;

@@ -4,8 +4,11 @@ import * as Y from 'yjs';
 import { useSocket } from '../../context/SocketContext';
 import { useRoomStore } from '../../store/roomStore';
 import { useEditorStore } from '../../store/editorStore';
-import { TbCopy, TbDownload, TbCheck, TbWand, TbPlayerPlay } from 'react-icons/tb';
+import { TbCopy, TbDownload, TbCheck, TbWand, TbPlayerPlay, TbRefresh, TbExternalLink } from 'react-icons/tb';
 import toast from 'react-hot-toast';
+import { MonacoBinding } from 'y-monaco';
+import { Awareness } from 'y-protocols/awareness';
+import * as awarenessProtocol from 'y-protocols/awareness';
 
 const LANGUAGES = [
   { value: 'javascript', label: 'JavaScript' },
@@ -21,38 +24,192 @@ const LANGUAGES = [
   { value: 'go', label: 'Go' },
 ];
 
-const EXT = { javascript: 'js', typescript: 'ts', python: 'py', java: 'java', cpp: 'cpp', html: 'html', css: 'css', json: 'json', markdown: 'md', rust: 'rs', go: 'go' };
+const EXT = {
+  javascript: 'js', typescript: 'ts', python: 'py', java: 'java',
+  cpp: 'cpp', html: 'html', css: 'css', json: 'json', markdown: 'md',
+  rust: 'rs', go: 'go',
+};
+
+const TEMPLATES = {
+  javascript: 'console.log("Hello World");\n',
+  typescript: 'console.log("Hello TypeScript");\n',
+  python: 'print("Hello World")\n',
+  java: 'class Main{\n  public static void main(String args[]){\n    System.out.println("Hello World");\n  }\n}\n',
+  cpp: '#include<bits/stdc++.h>\nusing namespace std;\n\nint main(){\n  cout << "Hello World";\n  return 0;\n}\n',
+  html: '<!DOCTYPE html>\n<html>\n<head>\n  <meta charset="UTF-8">\n  <title>Live Preview</title>\n  <style>\n    body {\n      font-family: system-ui, sans-serif;\n      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);\n      min-height: 100vh;\n      display: flex;\n      align-items: center;\n      justify-content: center;\n      margin: 0;\n    }\n    .card {\n      background: white;\n      border-radius: 16px;\n      padding: 40px;\n      text-align: center;\n      box-shadow: 0 20px 60px rgba(0,0,0,0.3);\n    }\n    h1 { color: #764ba2; margin: 0 0 8px; }\n    p { color: #666; margin: 0; }\n  </style>\n</head>\n<body>\n  <div class="card">\n    <h1>Hello, SyncSpace! 🚀</h1>\n    <p>Start editing to see changes live.</p>\n  </div>\n\n  <script>\n    console.log("Preview loaded!");\n  </script>\n</body>\n</html>\n',
+  css: 'body {\n  margin: 0;\n  padding: 0;\n}\n',
+  json: '{\n  "key": "value"\n}\n',
+  markdown: '# Hello World\n',
+  rust: 'fn main() {\n    println!("Hello World");\n}\n',
+  go: 'package main\n\nimport "fmt"\n\nfunc main() {\n    fmt.Println("Hello World")\n}\n',
+};
+
+/**
+ * Wraps raw code in a full HTML document with runtime error catching.
+ * For proper HTML documents (<html> tag present), injects error handler into <head>.
+ */
+function buildPreviewDocument(code) {
+  if (!code || code.trim() === '') return '';
+
+  const errorCatcher = `<script>
+(function() {
+  window.onerror = function(msg, src, line, col, err) {
+    var d = document.createElement('div');
+    d.style.cssText = [
+      'position:fixed;bottom:0;left:0;right:0;z-index:9999',
+      'background:#1a0000;color:#f87171;border-top:2px solid #dc2626',
+      'padding:10px 16px;font:13px/1.5 monospace;white-space:pre-wrap',
+    ].join(';');
+    d.textContent = '\u26A0\uFE0F JS Error: ' + msg + (line ? ' (line ' + line + ')' : '');
+    document.body.appendChild(d);
+    return false;
+  };
+  var _origError = console.error;
+  console.error = function() {
+    var d = document.createElement('div');
+    d.style.cssText = [
+      'position:fixed;bottom:0;left:0;right:0;z-index:9999',
+      'background:#1a0000;color:#f87171;border-top:2px solid #dc2626',
+      'padding:10px 16px;font:13px/1.5 monospace;white-space:pre-wrap',
+    ].join(';');
+    d.textContent = '\u26A0\uFE0F Console Error: ' + Array.from(arguments).join(' ');
+    document.body.appendChild(d);
+    _origError.apply(console, arguments);
+  };
+})();
+<\/script>`;
+
+  const lc = code.toLowerCase();
+  if (lc.includes('<html')) {
+    // Full HTML doc — inject error catcher into <head> or prepend to <body>
+    if (lc.includes('<head>')) {
+      return code.replace(/<head>/i, '<head>\n' + errorCatcher);
+    }
+    if (lc.includes('<head')) {
+      return code.replace(/<head[^>]*>/i, (m) => m + '\n' + errorCatcher);
+    }
+    return errorCatcher + code;
+  }
+
+  // Partial HTML snippet — wrap in a full document
+  return `<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  ${errorCatcher}
+  <style>body { font-family: system-ui, sans-serif; }</style>
+</head>
+<body>
+${code}
+</body>
+</html>`;
+}
 
 export default function EditorPanel() {
   const { currentRoom, currentSession } = useRoomStore();
-  const { language, setLanguage, theme: editorTheme, setTheme: setEditorTheme, fontSize, setFontSize } = useEditorStore();
-  const { emitEditorSync, emitEditorUpdate, emitLanguageChange, onYjsSync, onYjsUpdate, onLanguageChange, isConnected, emitTypingStart, emitTypingStop } = useSocket();
+  const {
+    language, setLanguage,
+    theme: editorTheme, setTheme: setEditorTheme,
+    fontSize, setFontSize,
+  } = useEditorStore();
+  const {
+    emitEditorSync, emitEditorUpdate, emitEditorAwareness,
+    emitLanguageChange, onYjsSync, onYjsUpdate, onYjsAwareness,
+    onLanguageChange, isConnected, emitTypingStart, emitTypingStop,
+    emitPreviewSync, onPreviewSync,
+  } = useSocket();
 
   const [editorValue, setEditorValue] = useState('// Start coding here...\n');
-  const [saveStatus, setSaveStatus] = useState('saved'); // 'saving' | 'saved'
+  const [saveStatus, setSaveStatus] = useState('saved');
   const [copied, setCopied] = useState(false);
 
-  // Code Execution States
+  // Console output state (JavaScript runner)
   const [isRunning, setIsRunning] = useState(false);
   const [output, setOutput] = useState([]);
   const [showConsole, setShowConsole] = useState(false);
 
+  // HTML Preview state
+  const [previewHtml, setPreviewHtml] = useState('');
+  const [previewLastUser, setPreviewLastUser] = useState(null); // {name, timestamp}
+  const isReceivingRemotePreview = useRef(false); // prevent echo loop
+
+  // Yjs + Editor refs
   const ydocRef = useRef(null);
   const editorRef = useRef(null);
+  const bindingRef = useRef(null);
+  const awarenessRef = useRef(null);
   const isApplyingUpdate = useRef(false);
   const saveTimer = useRef(null);
   const typingTimeoutRef = useRef(null);
-  const yjsUpdateTimer = useRef(null);
   const runCodeRef = useRef(null);
+  const previewDebounceRef = useRef(null);
+  const [editorReady, setEditorReady] = useState(false);
 
+  // ── HTML Preview: auto-update on code change (500ms debounce) ──────────
   useEffect(() => {
-    if (!currentRoom) return;
+    if (language !== 'html') {
+      setPreviewHtml(''); // clear when switching away from HTML
+      return;
+    }
+    clearTimeout(previewDebounceRef.current);
+    previewDebounceRef.current = setTimeout(() => {
+      if (isReceivingRemotePreview.current) return; // don't echo back
+      const html = buildPreviewDocument(editorValue);
+      setPreviewHtml(html);
+      // Broadcast to all room participants
+      if (currentRoom?._id && isConnected && html) {
+        emitPreviewSync(currentRoom._id, html);
+      }
+    }, 500);
+    return () => clearTimeout(previewDebounceRef.current);
+  }, [editorValue, language, isConnected, currentRoom?._id]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // ── Receive remote preview sync from other participants ────────────────
+  useEffect(() => {
+    if (!onPreviewSync) return;
+    const cleanup = onPreviewSync(({ html, userName, timestamp }) => {
+      if (!html) return;
+      isReceivingRemotePreview.current = true;
+      setPreviewHtml(html);
+      setPreviewLastUser({ name: userName, timestamp });
+      // reset the flag after a tick so local changes still work
+      setTimeout(() => { isReceivingRemotePreview.current = false; }, 100);
+    });
+    return cleanup;
+  }, [onPreviewSync]);
+
+  // ── Run HTML manually (Run button) ─────────────────────────────────────
+  const handleRunHtml = useCallback(() => {
+    const code = editorRef.current?.getValue() || '';
+    const html = buildPreviewDocument(code);
+    setPreviewHtml(html);
+    if (currentRoom?._id && isConnected && html) {
+      emitPreviewSync(currentRoom._id, html);
+      toast.success('Preview synced to all participants!', { duration: 1500 });
+    }
+  }, [currentRoom?._id, isConnected, emitPreviewSync]);
+
+  // ── Yjs setup ──────────────────────────────────────────────────────────
+  useEffect(() => {
+    if (!currentRoom || !editorReady || !editorRef.current) return;
 
     const doc = new Y.Doc();
     ydocRef.current = doc;
     const ytext = doc.getText('codestate');
 
-    // Send state vector to server to get full state
+    const awareness = new Awareness(doc);
+    awarenessRef.current = awareness;
+
+    // Bind Monaco ↔ Yjs
+    bindingRef.current = new MonacoBinding(
+      ytext,
+      editorRef.current.getModel(),
+      new Set([editorRef.current]),
+      awareness
+    );
+
+    // Send state vector to get current document state
     const stateVector = Y.encodeStateVector(doc);
     emitEditorSync(currentRoom._id, 'sv', Array.from(stateVector));
 
@@ -66,24 +223,37 @@ export default function EditorPanel() {
     };
     doc.on('update', handleLocalUpdate);
 
+    const handleAwarenessUpdate = ({ added, updated, removed }, origin) => {
+      if (origin !== 'socket' && isConnected) {
+        const changedClients = added.concat(updated).concat(removed);
+        const update = awarenessProtocol.encodeAwarenessUpdate(awareness, changedClients);
+        emitEditorAwareness(currentRoom._id, Array.from(update));
+      }
+    };
+    awareness.on('update', handleAwarenessUpdate);
+
     const cleanSync = onYjsSync(({ type, data }) => {
       if (type === 'update' && data?.length) {
-        isApplyingUpdate.current = true;
         try {
           Y.applyUpdate(doc, new Uint8Array(data), 'socket');
-          setEditorValue(ytext.toString() || '// Start coding here...\n');
+          if (ytext.toString() === '') {
+            const defaultTemplate = TEMPLATES[language] || '';
+            if (defaultTemplate) {
+              doc.transact(() => { ytext.insert(0, defaultTemplate); }, 'local');
+            }
+          }
         } catch (e) { console.warn('Yjs sync error:', e); }
-        isApplyingUpdate.current = false;
       }
     });
 
     const cleanUpdate = onYjsUpdate(({ update }) => {
-      isApplyingUpdate.current = true;
-      try {
-        Y.applyUpdate(doc, new Uint8Array(update), 'socket');
-        setEditorValue(ytext.toString() || '// Start coding here...\n');
-      } catch (e) { console.warn('Yjs update error:', e); }
-      isApplyingUpdate.current = false;
+      try { Y.applyUpdate(doc, new Uint8Array(update), 'socket'); }
+      catch (e) { console.warn('Yjs update error:', e); }
+    });
+
+    const cleanAwareness = onYjsAwareness(({ update }) => {
+      try { awarenessProtocol.applyAwarenessUpdate(awareness, new Uint8Array(update), 'socket'); }
+      catch (e) { console.warn('Yjs awareness error:', e); }
     });
 
     const cleanLang = onLanguageChange(({ language: newLang, name }) => {
@@ -93,58 +263,60 @@ export default function EditorPanel() {
 
     return () => {
       doc.off('update', handleLocalUpdate);
-      cleanSync(); cleanUpdate(); cleanLang();
+      awareness.off('update', handleAwarenessUpdate);
+      cleanSync(); cleanUpdate(); cleanAwareness(); cleanLang();
+      bindingRef.current?.destroy();
       doc.destroy();
       clearTimeout(saveTimer.current);
     };
-  }, [currentRoom?._id, isConnected]);
+  }, [currentRoom?._id, isConnected, editorReady]); // eslint-disable-line react-hooks/exhaustive-deps
 
+  // ── Editor change handler (typing indicators) ──────────────────────────
   const handleEditorChange = useCallback((value) => {
-    if (isApplyingUpdate.current) return;
-    setEditorValue(value || '');
-
-    // Debounce the heavy Yjs replace-all transaction to reduce CRDT conflicts
-    // during concurrent typing — batches rapid keystrokes into a single op
-    clearTimeout(yjsUpdateTimer.current);
-    yjsUpdateTimer.current = setTimeout(() => {
-      const doc = ydocRef.current;
-      if (!doc) return;
-      const ytext = doc.getText('codestate');
-      doc.transact(() => {
-        ytext.delete(0, ytext.length);
-        ytext.insert(0, value || '');
-      }, 'local');
-    }, 80);
-
+    setEditorValue(value ?? '');
     emitTypingStart(currentRoom?._id);
     if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
     typingTimeoutRef.current = setTimeout(() => {
       emitTypingStop(currentRoom?._id);
     }, 2000);
-  }, []);
+  }, [currentRoom?._id]); // eslint-disable-line react-hooks/exhaustive-deps
 
+  // ── Format document ─────────────────────────────────────────────────────
   const handleFormat = () => {
-    if (editorRef.current) {
-      editorRef.current.getAction('editor.action.formatDocument').run();
-    }
+    editorRef.current?.getAction('editor.action.formatDocument')?.run();
   };
 
+  // ── Language change ─────────────────────────────────────────────────────
   const handleLanguageChange = (e) => {
     const lang = e.target.value;
     setLanguage(lang);
     emitLanguageChange(currentRoom._id, lang);
+
+    if (ydocRef.current) {
+      const ytext = ydocRef.current.getText('codestate');
+      if (ytext.toString().trim() === '') {
+        const tpl = TEMPLATES[lang] || '';
+        if (tpl) {
+          ydocRef.current.transact(() => { ytext.insert(0, tpl); }, 'local');
+        }
+      }
+    }
   };
 
+  // ── Copy ────────────────────────────────────────────────────────────────
   const handleCopy = () => {
-    navigator.clipboard.writeText(editorValue);
+    const val = editorRef.current ? editorRef.current.getValue() : '';
+    navigator.clipboard.writeText(val);
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
     toast.success('Copied!');
   };
 
+  // ── Download ────────────────────────────────────────────────────────────
   const handleDownload = () => {
     const ext = EXT[language] || 'txt';
-    const blob = new Blob([editorValue], { type: 'text/plain;charset=utf-8' });
+    const val = editorRef.current ? editorRef.current.getValue() : '';
+    const blob = new Blob([val], { type: 'text/plain;charset=utf-8' });
     const a = document.createElement('a');
     a.href = URL.createObjectURL(blob);
     a.download = `code.${ext}`;
@@ -152,7 +324,16 @@ export default function EditorPanel() {
     URL.revokeObjectURL(a.href);
   };
 
-  // JS Code execution engine in browser
+  // ── Open preview in new tab ─────────────────────────────────────────────
+  const handleOpenPreviewTab = () => {
+    const html = previewHtml || buildPreviewDocument(editorRef.current?.getValue() || '');
+    const blob = new Blob([html], { type: 'text/html' });
+    const url = URL.createObjectURL(blob);
+    window.open(url, '_blank');
+    setTimeout(() => URL.revokeObjectURL(url), 10000);
+  };
+
+  // ── JavaScript code runner ──────────────────────────────────────────────
   const handleRunCode = useCallback(() => {
     if (language !== 'javascript') {
       toast.error('Code execution is currently supported for JavaScript only.');
@@ -171,21 +352,22 @@ export default function EditorPanel() {
         const originalInfo = console.info;
 
         console.log = (...args) => {
-          logs.push(args.map(arg => typeof arg === 'object' ? JSON.stringify(arg, null, 2) : String(arg)).join(' '));
+          logs.push(args.map((a) => (typeof a === 'object' ? JSON.stringify(a, null, 2) : String(a))).join(' '));
         };
         console.error = (...args) => {
-          logs.push('[ERROR] ' + args.map(arg => typeof arg === 'object' ? JSON.stringify(arg, null, 2) : String(arg)).join(' '));
+          logs.push('[ERROR] ' + args.map((a) => (typeof a === 'object' ? JSON.stringify(a, null, 2) : String(a))).join(' '));
         };
         console.warn = (...args) => {
-          logs.push('[WARN] ' + args.map(arg => typeof arg === 'object' ? JSON.stringify(arg, null, 2) : String(arg)).join(' '));
+          logs.push('[WARN] ' + args.map((a) => (typeof a === 'object' ? JSON.stringify(a, null, 2) : String(a))).join(' '));
         };
         console.info = (...args) => {
-          logs.push('[INFO] ' + args.map(arg => typeof arg === 'object' ? JSON.stringify(arg, null, 2) : String(arg)).join(' '));
+          logs.push('[INFO] ' + args.map((a) => (typeof a === 'object' ? JSON.stringify(a, null, 2) : String(a))).join(' '));
         };
 
         try {
-          // Standard JS execution in browser
-          const result = eval(editorValue);
+          const val = editorRef.current ? editorRef.current.getValue() : '';
+          // eslint-disable-next-line no-eval
+          const result = eval(val);
           if (result !== undefined) {
             logs.push(`=> ${typeof result === 'object' ? JSON.stringify(result, null, 2) : String(result)}`);
           }
@@ -203,18 +385,20 @@ export default function EditorPanel() {
       } finally {
         setIsRunning(false);
       }
-    }, 150); // slight timeout to show loading spinner
-  }, [editorValue, language]);
+    }, 150);
+  }, [language]);
 
-  useEffect(() => {
-    runCodeRef.current = handleRunCode;
-  }, [handleRunCode]);
+  useEffect(() => { runCodeRef.current = handleRunCode; }, [handleRunCode]);
+
+  // ── Render ─────────────────────────────────────────────────────────────
+  const isHtml = language === 'html';
 
   return (
     <div className="flex flex-col h-full bg-surface-950 overflow-hidden">
-      {/* Toolbar */}
+
+      {/* ── Toolbar ───────────────────────────────────────────────── */}
       <div className="flex-shrink-0 h-12 bg-surface-900 border-b border-surface-800 px-3 flex items-center gap-2">
-        {/* Language selector */}
+        {/* Language */}
         <select
           value={language}
           onChange={handleLanguageChange}
@@ -223,7 +407,7 @@ export default function EditorPanel() {
           {LANGUAGES.map((l) => <option key={l.value} value={l.value}>{l.label}</option>)}
         </select>
 
-        {/* Theme selector */}
+        {/* Theme */}
         <select
           value={editorTheme}
           onChange={(e) => setEditorTheme(e.target.value)}
@@ -242,15 +426,15 @@ export default function EditorPanel() {
           {[12, 13, 14, 15, 16, 18, 20, 22].map((s) => <option key={s} value={s}>{s}px</option>)}
         </select>
 
-        {/* Run code button */}
-        {language === 'javascript' && (
+        {/* Run button */}
+        {(language === 'javascript' || isHtml) && (
           <button
-            onClick={handleRunCode}
-            disabled={isRunning}
-            className="flex items-center gap-1.5 px-3 py-1 bg-green-600 hover:bg-green-500 text-white rounded-lg text-xs font-semibold disabled:opacity-50 transition-colors shadow-glow-sm"
+            onClick={isHtml ? handleRunHtml : handleRunCode}
+            disabled={isRunning && !isHtml}
+            className="flex items-center gap-1.5 px-3 py-1 bg-green-600 hover:bg-green-500 text-white rounded-lg text-xs font-semibold disabled:opacity-50 transition-colors"
           >
             <TbPlayerPlay size={13} />
-            <span>{isRunning ? 'Running...' : 'Run'}</span>
+            <span>{isRunning && !isHtml ? 'Running...' : 'Run'}</span>
           </button>
         )}
 
@@ -272,83 +456,137 @@ export default function EditorPanel() {
         </div>
       </div>
 
-      {/* Editor + Output split container */}
-      <div className="flex-1 overflow-hidden relative flex flex-col">
-        <div className="flex-1 min-h-0">
-          <MonacoEditor
-            height="100%"
-            language={language}
-            theme={editorTheme}
-            value={editorValue}
-            onChange={handleEditorChange}
-            onMount={(editor, monaco) => {
-              editorRef.current = editor;
-              // Add command to bind Ctrl+Enter shortcut within Monaco
-              editor.addCommand(monaco.KeyMod.CtrlCmd | monaco.KeyCode.Enter, () => {
-                runCodeRef.current?.();
-              });
-            }}
-            options={{
-              fontSize,
-              minimap: { enabled: false },
-              automaticLayout: true,
-              scrollBeyondLastLine: false,
-              wordWrap: 'on',
-              lineNumbers: 'on',
-              renderLineHighlight: 'all',
-              cursorBlinking: 'smooth',
-              cursorSmoothCaretAnimation: 'on',
-              smoothScrolling: true,
-              padding: { top: 12, bottom: 12 },
-              fontFamily: "'JetBrains Mono', 'Fira Code', monospace",
-              fontLigatures: true,
-            }}
-          />
+      {/* ── Main editor + preview area ──────────────────────────── */}
+      <div className="flex-1 overflow-hidden relative flex flex-col md:flex-row">
+
+        {/* Left: Monaco Editor + Console */}
+        <div className={`flex flex-col overflow-hidden ${isHtml ? 'w-full md:w-1/2 border-b md:border-b-0 md:border-r border-surface-800' : 'flex-1'}`}>
+          <div className="flex-1 min-h-0">
+            <MonacoEditor
+              height="100%"
+              language={language}
+              theme={editorTheme}
+              onChange={handleEditorChange}
+              onMount={(editor, monaco) => {
+                editorRef.current = editor;
+                setEditorReady(true);
+                setEditorValue(editor.getValue());
+                editor.onDidChangeModelContent(() => {
+                  setEditorValue(editor.getValue());
+                });
+                // Ctrl+Enter shortcut
+                editor.addCommand(monaco.KeyMod.CtrlCmd | monaco.KeyCode.Enter, () => {
+                  if (useEditorStore.getState().language === 'javascript') {
+                    runCodeRef.current?.();
+                  } else if (useEditorStore.getState().language === 'html') {
+                    handleRunHtml();
+                  }
+                });
+              }}
+              options={{
+                fontSize,
+                minimap: { enabled: false },
+                automaticLayout: true,
+                scrollBeyondLastLine: false,
+                wordWrap: 'on',
+                lineNumbers: 'on',
+                renderLineHighlight: 'all',
+                cursorBlinking: 'smooth',
+                cursorSmoothCaretAnimation: 'on',
+                smoothScrolling: true,
+                padding: { top: 12, bottom: 12 },
+                fontFamily: "'JetBrains Mono', 'Fira Code', monospace",
+                fontLigatures: true,
+              }}
+            />
+          </div>
+
+          {/* Console output (JS runner) */}
+          {showConsole && (
+            <div className="h-44 border-t border-slate-800 bg-[#070b13] flex flex-col flex-shrink-0 text-white font-mono text-[11px]">
+              <div className="flex items-center justify-between px-4 py-2 bg-slate-900/60 border-b border-slate-800">
+                <span className="text-[10px] uppercase font-bold text-slate-400 tracking-wider">Console Output</span>
+                <div className="flex items-center gap-2">
+                  <button onClick={() => setOutput([])} className="px-2 py-0.5 bg-slate-800 hover:bg-slate-700 hover:text-white rounded text-[10px] text-slate-450 transition-colors">Clear</button>
+                  <button onClick={() => setShowConsole(false)} className="px-2 py-0.5 bg-red-950/20 hover:bg-red-900/30 hover:text-red-300 rounded text-[10px] text-red-400 transition-colors">Close</button>
+                </div>
+              </div>
+              <div className="flex-1 p-3 overflow-y-auto space-y-1 select-text selection:bg-indigo-500/30">
+                {output.length === 0 ? (
+                  <div className="text-slate-500 italic">No output. Click "Run" to execute the code.</div>
+                ) : (
+                  output.map((line, idx) => {
+                    let cls = 'text-slate-300';
+                    if (line.startsWith('[ERROR]')) cls = 'text-red-400';
+                    else if (line.startsWith('[WARN]')) cls = 'text-yellow-400';
+                    else if (line.startsWith('[INFO]')) cls = 'text-blue-400';
+                    else if (line.startsWith('=>')) cls = 'text-green-400 font-semibold';
+                    else if (line.startsWith('Runtime Error:')) cls = 'text-red-500 font-semibold border-l-2 border-red-500 pl-2 py-0.5 bg-red-950/10';
+                    return (
+                      <div key={idx} className={`${cls} whitespace-pre-wrap leading-relaxed`}>{line}</div>
+                    );
+                  })
+                )}
+              </div>
+            </div>
+          )}
         </div>
 
-        {/* OUTPUT PANEL */}
-        {showConsole && (
-          <div className="h-44 border-t border-slate-800 bg-[#070b13] flex flex-col flex-shrink-0 text-white font-mono text-[11px]">
-            <div className="flex items-center justify-between px-4 py-2 bg-slate-900/60 border-b border-slate-800">
-              <span className="text-[10px] uppercase font-bold text-slate-400 tracking-wider">Console Output</span>
+        {/* Right: Live HTML/CSS/JS Preview */}
+        {isHtml && (
+          <div className="w-full md:w-1/2 flex flex-col h-full bg-white relative">
+            {/* Preview header */}
+            <div className="flex-shrink-0 h-9 bg-surface-100 border-b border-surface-200 px-3 flex items-center justify-between">
               <div className="flex items-center gap-2">
+                <div className="flex gap-1">
+                  <span className="w-2.5 h-2.5 rounded-full bg-red-400" />
+                  <span className="w-2.5 h-2.5 rounded-full bg-yellow-400" />
+                  <span className="w-2.5 h-2.5 rounded-full bg-green-400" />
+                </div>
+                <span className="text-xs font-semibold text-surface-600 uppercase tracking-wider">Live Preview</span>
+                {previewLastUser && (
+                  <span className="text-[10px] text-surface-400 ml-1">
+                    — synced by <span className="text-primary-500 font-medium">{previewLastUser.name}</span>
+                  </span>
+                )}
+              </div>
+              <div className="flex items-center gap-1">
                 <button
-                  onClick={() => setOutput([])}
-                  className="px-2 py-0.5 bg-slate-800 hover:bg-slate-700 hover:text-white rounded text-[10px] text-slate-450 transition-colors"
+                  onClick={handleRunHtml}
+                  title="Refresh preview & sync to all"
+                  className="p-1 text-surface-500 hover:text-surface-800 hover:bg-surface-200 rounded transition-colors"
                 >
-                  Clear
+                  <TbRefresh size={14} />
                 </button>
                 <button
-                  onClick={() => setShowConsole(false)}
-                  className="px-2 py-0.5 bg-red-950/20 hover:bg-red-900/30 hover:text-red-300 rounded text-[10px] text-red-400 transition-colors"
+                  onClick={handleOpenPreviewTab}
+                  title="Open in new tab"
+                  className="p-1 text-surface-500 hover:text-surface-800 hover:bg-surface-200 rounded transition-colors"
                 >
-                  Close
+                  <TbExternalLink size={14} />
                 </button>
               </div>
             </div>
-            <div className="flex-1 p-3 overflow-y-auto space-y-1 select-text selection:bg-indigo-500/30">
-              {output.length === 0 ? (
-                <div className="text-slate-500 italic">No output. Click "Run" to execute the code.</div>
+
+            {/* iframe preview */}
+            <div className="flex-1 overflow-hidden relative bg-white">
+              {previewHtml ? (
+                <iframe
+                  key={previewHtml.length} // force re-mount on significant changes
+                  title="live-preview"
+                  srcDoc={previewHtml}
+                  className="w-full h-full border-none"
+                  sandbox="allow-scripts allow-same-origin allow-modals allow-forms allow-popups"
+                />
               ) : (
-                output.map((line, idx) => {
-                  let textClass = "text-slate-300";
-                  if (line.startsWith('[ERROR]')) {
-                    textClass = "text-red-400";
-                  } else if (line.startsWith('[WARN]')) {
-                    textClass = "text-yellow-400";
-                  } else if (line.startsWith('[INFO]')) {
-                    textClass = "text-blue-400";
-                  } else if (line.startsWith('=>')) {
-                    textClass = "text-green-400 font-semibold";
-                  } else if (line.startsWith('Runtime Error:')) {
-                    textClass = "text-red-500 font-semibold border-l-2 border-red-500 pl-2 py-0.5 bg-red-950/10";
-                  }
-                  return (
-                    <div key={idx} className={`${textClass} whitespace-pre-wrap leading-relaxed`}>
-                      {line}
-                    </div>
-                  );
-                })
+                <div className="flex flex-col items-center justify-center h-full text-surface-400 text-sm p-6 text-center bg-surface-50">
+                  <div className="w-16 h-16 mb-4 rounded-2xl bg-surface-100 flex items-center justify-center">
+                    <TbPlayerPlay size={28} className="text-surface-300" />
+                  </div>
+                  <p className="font-medium text-surface-500 mb-1">Live Preview</p>
+                  <p className="text-xs text-surface-400">Start typing HTML to see the output here.</p>
+                  <p className="text-xs text-surface-400 mt-1">Preview syncs automatically to all participants.</p>
+                </div>
               )}
             </div>
           </div>
