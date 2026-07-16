@@ -213,7 +213,21 @@ export default function CollaboratePage() {
         setMeetingState({ isInMeeting: true, localStream: stream });
         emitMeetingJoin(currentRoom?._id);
       } catch (err) {
-        toast.error('Microphone/Camera access denied.');
+        try {
+          const audioStream = await navigator.mediaDevices.getUserMedia({ video: false, audio: true });
+          setMeetingState({ isInMeeting: true, localStream: audioStream, videoEnabled: false });
+          emitMeetingJoin(currentRoom?._id);
+        } catch (err2) {
+          try {
+            const videoStream = await navigator.mediaDevices.getUserMedia({ video: true, audio: false });
+            setMeetingState({ isInMeeting: true, localStream: videoStream, audioEnabled: false });
+            emitMeetingJoin(currentRoom?._id);
+          } catch (err3) {
+            setMeetingState({ isInMeeting: true, localStream: null, audioEnabled: false, videoEnabled: false });
+            emitMeetingJoin(currentRoom?._id);
+            toast.info('Joined as viewer (No camera/mic access).');
+          }
+        }
       }
     }
   };
@@ -416,10 +430,10 @@ export default function CollaboratePage() {
         </FeatureBoundary>
 
         {/* Screen Share Viewer */}
-        {meetingParticipants.some(p => p.isSharingScreen) && (
+        {meetingParticipants.some(p => p.isSharingScreen && p.screenStream) && (
           <FeatureBoundary name="ScreenShareViewer">
-            <div className="absolute inset-0 z-40 bg-black">
-              <ScreenShareViewer stream={meetingParticipants.find(p => p.isSharingScreen)?.screenStream} />
+            <div className="absolute inset-0 z-40">
+              <ScreenShareViewer stream={meetingParticipants.find(p => p.isSharingScreen && p.screenStream)?.screenStream} />
             </div>
           </FeatureBoundary>
         )}
