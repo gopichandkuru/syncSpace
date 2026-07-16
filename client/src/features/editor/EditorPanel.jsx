@@ -118,6 +118,7 @@ export default function EditorPanel() {
     emitLanguageChange, onYjsSync, onYjsUpdate, onYjsAwareness,
     onLanguageChange, isConnected, emitTypingStart, emitTypingStop,
     emitPreviewSync, onPreviewSync,
+    emitCodeRun, emitCodeOutput, onCodeRun, onCodeOutput,
   } = useSocket();
 
   const [editorValue, setEditorValue] = useState('// Start coding here...\n');
@@ -178,6 +179,36 @@ export default function EditorPanel() {
     });
     return cleanup;
   }, [onPreviewSync]);
+
+  // ── Receive remote code execution sync ─────────────────────────────────
+  useEffect(() => {
+    if (!onCodeRun || !onCodeOutput) return;
+    
+    const cleanRun = onCodeRun(({ language: runLang, userName }) => {
+      if (language === runLang) {
+        setShowConsole(true);
+        setIsRunning(true);
+        setOutput([`Executing code... (started by ${userName})`]);
+      }
+    });
+
+    const cleanOutput = onCodeOutput(({ output: newOutput, language: runLang, userName, executionTime }) => {
+      if (language === runLang) {
+        setShowConsole(true);
+        setIsRunning(false);
+        const finalOutput = [...newOutput];
+        if (executionTime) {
+          finalOutput.push(`\n[Execution time: ${executionTime}ms]`);
+        }
+        setOutput(finalOutput);
+      }
+    });
+
+    return () => {
+      cleanRun();
+      cleanOutput();
+    };
+  }, [onCodeRun, onCodeOutput, language]);
 
   // ── Run HTML manually (Run button) ─────────────────────────────────────
   const handleRunHtml = useCallback(() => {
@@ -333,60 +364,99 @@ export default function EditorPanel() {
     setTimeout(() => URL.revokeObjectURL(url), 10000);
   };
 
-  // ── JavaScript code runner ──────────────────────────────────────────────
-  const handleRunCode = useCallback(() => {
-    if (language !== 'javascript') {
-      toast.error('Code execution is currently supported for JavaScript only.');
+  // ── Code Runner (Piston API & Local JS fallback) ────────────────────────
+  const handleRunCode = useCallback(async () => {
+    if (language === 'html' || language === 'css' || language === 'markdown' || language === 'json') {
+      toast.error(`Code execution is not supported for ${language}.`);
       return;
     }
+
+    const val = editorRef.current ? editorRef.current.getValue() : '';
+    if (!val.trim()) {
+      toast.error('Editor is empty.');
+      return;
+    }
+
     setIsRunning(true);
     setShowConsole(true);
     setOutput(['Executing code...']);
+    
+    // Broadcast execution start
+    if (currentRoom?._id && isConnected) {
+      emitCodeRun(currentRoom._id, language);
+    }
 
-    setTimeout(() => {
-      try {
-        const logs = [];
-        const originalLog = console.log;
-        const originalError = console.error;
-        const originalWarn = console.warn;
-        const originalInfo = console.info;
+    const startTime = Date.now();
+    try {
+      // Map editor language to Piston API language
+      const langMap = {
+        javascript: 'javascript',
+        typescript: 'typescript',
+        python: 'python',
+        java: 'java',
+        cpp: 'c++',
+        rust: 'rust',
+        go: 'go'
+      };
 
-        console.log = (...args) => {
-          logs.push(args.map((a) => (typeof a === 'object' ? JSON.stringify(a, null, 2) : String(a))).join(' '));
-        };
-        console.error = (...args) => {
-          logs.push('[ERROR] ' + args.map((a) => (typeof a === 'object' ? JSON.stringify(a, null, 2) : String(a))).join(' '));
-        };
-        console.warn = (...args) => {
-          logs.push('[WARN] ' + args.map((a) => (typeof a === 'object' ? JSON.stringify(a, null, 2) : String(a))).join(' '));
-        };
-        console.info = (...args) => {
-          logs.push('[INFO] ' + args.map((a) => (typeof a === 'object' ? JSON.stringify(a, null, 2) : String(a))).join(' '));
-        };
+      const pistonLang = langMap[language];
 
-        try {
-          const val = editorRef.current ? editorRef.current.getValue() : '';
-          // eslint-disable-next-line no-eval
-          const result = eval(val);
-          if (result !== undefined) {
-            logs.push(`=> ${typeof result === 'object' ? JSON.stringify(result, null, 2) : String(result)}`);
-          }
-          setOutput(logs.length > 0 ? logs : ['Code executed successfully with no output.']);
-        } catch (err) {
-          setOutput([...logs, `Runtime Error: ${err.message}`]);
-        } finally {
-          console.log = originalLog;
-          console.error = originalError;
-          console.warn = originalWarn;
-          console.info = originalInfo;
-        }
-      } catch (globalErr) {
-        setOutput([`Execution Failed: ${globalErr.message}`]);
-      } finally {
-        setIsRunning(false);
+      if (!pistonLang) {
+        throw new Error(`Unsupported language for execution: ${language}`);
       }
-    }, 150);
-  }, [language]);
+
+      // Call Piston API
+      const response = await fetch('https://emkc.org/api/v2/piston/execute', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          language: pistonLang,
+          version: '*',
+          files: [{ content: val }]
+        })
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to execute code on server.');
+      }
+
+      const data = await response.json();
+      const executionTime = Date.now() - startTime;
+      
+      const newOutput = [];
+      if (data.compile && data.compile.output) {
+        newOutput.push('[COMPILE OUTPUT]');
+        newOutput.push(...data.compile.output.split('\n'));
+      }
+      if (data.run && data.run.output) {
+        if (data.run.stderr) {
+          newOutput.push(`Runtime Error:\n${data.run.stderr}`);
+        }
+        newOutput.push(...data.run.stdout.split('\n'));
+      }
+      
+      if (newOutput.length === 0) {
+        newOutput.push('Code executed successfully with no output.');
+      }
+
+      setOutput(newOutput);
+
+      // Broadcast execution output
+      if (currentRoom?._id && isConnected) {
+        emitCodeOutput(currentRoom._id, newOutput, language, executionTime);
+      }
+    } catch (err) {
+      const errOutput = [`Execution Failed: ${err.message}`];
+      setOutput(errOutput);
+      if (currentRoom?._id && isConnected) {
+        emitCodeOutput(currentRoom._id, errOutput, language, Date.now() - startTime);
+      }
+    } finally {
+      setIsRunning(false);
+    }
+  }, [language, currentRoom?._id, isConnected, emitCodeRun, emitCodeOutput]);
 
   useEffect(() => { runCodeRef.current = handleRunCode; }, [handleRunCode]);
 

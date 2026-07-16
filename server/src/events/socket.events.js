@@ -60,6 +60,10 @@ const SOCKET_EVENTS = {
 
   // Live Preview Sync
   PREVIEW_SYNC: 'preview:sync',
+
+  // Code Execution Sync
+  CODE_RUN: 'code:run',
+  CODE_OUTPUT: 'code:output',
 };
 
 module.exports = SOCKET_EVENTS;

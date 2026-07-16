@@ -27,6 +27,7 @@ const EVENTS = {
   NOTIFICATION: 'notification',
   DOCUMENT_CREATED: 'document:created', FILE_CREATED: 'file:created',
   PREVIEW_SYNC: 'preview:sync',
+  CODE_RUN: 'code:run', CODE_OUTPUT: 'code:output',
 };
 
 export function SocketProvider({ children }) {
@@ -177,6 +178,22 @@ export function SocketProvider({ children }) {
     return () => socketRef.current?.off(EVENTS.PREVIEW_SYNC, cb);
   };
 
+  // ── Code Execution Sync helpers ─────────────────────────────────
+  const emitCodeRun = (roomId, language) => {
+    socketRef.current?.emit(EVENTS.CODE_RUN, { roomId, language });
+  };
+  const emitCodeOutput = (roomId, output, language, executionTime) => {
+    socketRef.current?.emit(EVENTS.CODE_OUTPUT, { roomId, output, language, executionTime });
+  };
+  const onCodeRun = (cb) => {
+    socketRef.current?.on(EVENTS.CODE_RUN, cb);
+    return () => socketRef.current?.off(EVENTS.CODE_RUN, cb);
+  };
+  const onCodeOutput = (cb) => {
+    socketRef.current?.on(EVENTS.CODE_OUTPUT, cb);
+    return () => socketRef.current?.off(EVENTS.CODE_OUTPUT, cb);
+  };
+
   return (
     <SocketContext.Provider value={{
       socket: socketRef.current,
@@ -201,8 +218,12 @@ export function SocketProvider({ children }) {
       emitChatMessage,
       emitChatSeen,
       emitPreviewSync,
+      emitCodeRun,
+      emitCodeOutput,
       onYjsSync, onYjsUpdate, onYjsAwareness, onLanguageChange, onCursorMove,
       onPreviewSync,
+      onCodeRun,
+      onCodeOutput,
       EVENTS,
     }}>
       {children}

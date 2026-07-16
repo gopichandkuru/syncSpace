@@ -14,9 +14,13 @@ exports.uploadFile = catchAsync(async (req, res, next) => {
 
   if (!req.file) return next(new AppError('No file provided', 400));
 
-  // Auto resource type handles non-images well
+  // Auto resource type handles non-images well, but Cloudinary fails on PDFs with auto on free tiers.
+  // We explicitly set it to 'raw' if it's not an image/video
+  const isImage = req.file.mimetype.startsWith('image/') || req.file.mimetype.startsWith('video/');
+  const resourceType = isImage ? 'auto' : 'raw';
+
   const result = await uploadToCloudinary(req.file.buffer, 'files', { 
-    resource_type: 'auto',
+    resource_type: resourceType,
     use_filename: true,
     unique_filename: true,
   });

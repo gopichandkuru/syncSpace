@@ -391,6 +391,29 @@ function initializeSocket(server) {
       });
     });
 
+    // ── Code Execution Sync ───────────────────────────────────────
+    socket.on(EVENTS.CODE_RUN, ({ roomId, language }) => {
+      const room = roomId || socket.currentRoom;
+      if (!room) return;
+      socket.to(room).emit(EVENTS.CODE_RUN, {
+        language,
+        userId: socket.user.id,
+        userName: socket.user.name,
+      });
+    });
+
+    socket.on(EVENTS.CODE_OUTPUT, ({ roomId, output, language, executionTime }) => {
+      const room = roomId || socket.currentRoom;
+      if (!room) return;
+      socket.to(room).emit(EVENTS.CODE_OUTPUT, {
+        output,
+        language,
+        executionTime,
+        userId: socket.user.id,
+        userName: socket.user.name,
+      });
+    });
+
     // ── Disconnect ─────────────────────────────────────────────────
     socket.on('disconnect', async () => {
       console.log(`🔌 Disconnected: ${socket.user?.name}`);
