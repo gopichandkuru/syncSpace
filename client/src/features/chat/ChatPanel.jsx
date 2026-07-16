@@ -25,9 +25,8 @@ export default function ChatPanel() {
     // Chat history is now loaded via ROOM_JOINED socket event in SocketContext
     emitChatSeen(currentRoom._id);
 
-    return () => {
-      reset();
-    };
+    // Do not reset chat history on unmount, otherwise messages disappear when closing the sidebar.
+    return () => {};
   }, [currentRoom?._id]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
