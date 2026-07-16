@@ -1,5 +1,8 @@
 services:
-  # Backend Node.js Web Service
+  # ──────────────────────────────────────────────────────────────────────
+  # Backend: Node.js Web Service
+  # Deploy URL: https://syncspace-backend-44cl.onrender.com
+  # ──────────────────────────────────────────────────────────────────────
   - type: web
     name: syncspace-backend
     env: node
@@ -13,26 +16,31 @@ services:
         value: production
       - key: PORT
         value: 5000
+      # MONGO_URI — set this in Render dashboard as a secret env var
       - key: MONGO_URI
-        value: mongodb://gopichand:chand1231@ac-hqejzkx-shard-00-00.dsywzlr.mongodb.net:27017,ac-hqejzkx-shard-00-01.dsywzlr.mongodb.net:27017,ac-hqejzkx-shard-00-02.dsywzlr.mongodb.net:27017/syncspace?ssl=true&authSource=admin
+        sync: false
+      # JWT secrets — set these in Render dashboard as secret env vars
       - key: JWT_ACCESS_SECRET
-        value: 7e64f1c13295b898ce2baf9155623a59fb8cb8576c069227b3ccfedf0d1c2e4be51cc74d5cc891bc51394036df717699
+        sync: false
       - key: JWT_REFRESH_SECRET
-        value: 7e8938d0b8d45626f5f082b96731ba637db07287f85ca111f16af585caffd7a93edf75d47cc25b64a7aee82e517240c4
+        sync: false
       - key: JWT_ACCESS_EXPIRES_IN
         value: 15m
       - key: JWT_REFRESH_EXPIRES_IN
         value: 7d
+      # CLIENT_URL: comma-separated list of allowed frontend origins
       - key: CLIENT_URL
         value: https://syncspace-frontend-05u3.onrender.com
       - key: APP_URL
         value: https://syncspace-backend-44cl.onrender.com
+      # Cloudinary — set these in Render dashboard as secret env vars
       - key: CLOUDINARY_CLOUD_NAME
         sync: false
       - key: CLOUDINARY_API_KEY
         sync: false
       - key: CLOUDINARY_API_SECRET
         sync: false
+      # SMTP — set these in Render dashboard as secret env vars
       - key: SMTP_HOST
         value: smtp.gmail.com
       - key: SMTP_PORT
@@ -44,7 +52,10 @@ services:
       - key: SMTP_FROM
         value: "SyncSpace <noreply@syncspace.io>"
 
-  # Frontend React/Vite Static Site
+  # ──────────────────────────────────────────────────────────────────────
+  # Frontend: React/Vite Static Site
+  # Deploy URL: https://syncspace-frontend-05u3.onrender.com
+  # ──────────────────────────────────────────────────────────────────────
   - type: web
     name: syncspace-frontend
     runtime: static
