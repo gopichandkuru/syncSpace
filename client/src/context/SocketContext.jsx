@@ -46,13 +46,25 @@ export function SocketProvider({ children }) {
       reconnectionAttempts: 5,
       reconnectionDelay: 1000,
       transports: ['websocket', 'polling'],
+      forceNew: true,
     });
 
     socketRef.current = socket;
 
     socket.on('connect', () => { setIsConnected(true); console.log('🔌 Socket connected'); });
     socket.on('disconnect', () => { setIsConnected(false); });
-    socket.on('connect_error', (err) => { console.error('Socket error:', err.message); });
+    socket.on('connect_error', async (err) => { 
+      console.error('Socket error:', err.message); 
+      if (err.message === 'Invalid token' || err.message === 'Authentication required') {
+        // Trigger the axios interceptor to refresh the token
+        try {
+          const { authService } = await import('../services/index.js');
+          await authService.getMe();
+        } catch (e) {
+          useAuthStore.getState().logout();
+        }
+      }
+    });
 
     socket.on(EVENTS.ROOM_JOINED, ({ room, members, whiteboardState, chatHistory, activeMeetingParticipants, activeScreenSharers }) => {
       setMembers(members);
