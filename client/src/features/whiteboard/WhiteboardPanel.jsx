@@ -257,8 +257,7 @@ export default function WhiteboardPanel({ height = 500 }) {
       try {
         const imported = JSON.parse(event.target.result);
         if (Array.isArray(imported)) {
-          clearCanvas();
-          imported.forEach(addShape);
+          useWhiteboardStore.getState().setShapes(imported);
           emitWhiteboardEvent(currentRoom?._id, { type: 'set_state', shapes: imported });
           toast.success('Imported JSON successfully');
         }

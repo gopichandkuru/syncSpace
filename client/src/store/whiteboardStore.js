@@ -66,7 +66,11 @@ export const useWhiteboardStore = create((set) => ({
     } else if (event.type === 'set_state') {
       newShapes = event.shapes || [];
     }
-    return { shapes: newShapes };
+    
+    // Update history so local undo/redo doesn't obliterate remote changes
+    const newHistory = state.history.slice(0, state.historyIndex + 1);
+    newHistory.push(newShapes);
+    return { shapes: newShapes, history: newHistory, historyIndex: newHistory.length - 1 };
   }),
 
   undo: () => set((state) => {
@@ -86,6 +90,6 @@ export const useWhiteboardStore = create((set) => ({
     return { shapes: [], history: newHistory, historyIndex: newHistory.length - 1, selectedIds: [] };
   }),
 
-  setInitialState: (shapes) => set({ shapes, history: [shapes], historyIndex: 0 }),
+  setInitialState: (shapes) => set({ shapes: shapes || [], history: [shapes || []], historyIndex: 0 }),
   markClean: () => set({ isDirty: false }),
 }));
