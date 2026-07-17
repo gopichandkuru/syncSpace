@@ -1,8 +1,10 @@
 import axios from 'axios';
 import { useAuthStore } from '../store/authStore';
 
+const baseURL = import.meta.env.VITE_API_URL || (import.meta.env.PROD ? 'https://syncspace-backend-44cl.onrender.com/api/v1' : 'http://localhost:5005/api/v1');
+
 const api = axios.create({
-  baseURL: import.meta.env.VITE_API_URL || (import.meta.env.PROD ? 'https://syncspace-backend-44cl.onrender.com/api/v1' : 'http://localhost:5005/api/v1'),
+  baseURL,
   withCredentials: true,
   headers: { 'Content-Type': 'application/json' },
 });
@@ -40,7 +42,7 @@ api.interceptors.response.use(
 
       try {
         const { data } = await axios.post(
-          `${import.meta.env.VITE_API_URL || '/api/v1'}/auth/refresh`,
+          `${baseURL}/auth/refresh`,
           {},
           { withCredentials: true }
         );

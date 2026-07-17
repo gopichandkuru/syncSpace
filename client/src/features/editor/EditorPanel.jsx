@@ -16,6 +16,9 @@ const LANGUAGES = [
   { value: 'python', label: 'Python' },
   { value: 'java', label: 'Java' },
   { value: 'cpp', label: 'C++' },
+  { value: 'c', label: 'C' },
+  { value: 'csharp', label: 'C#' },
+  { value: 'php', label: 'PHP' },
   { value: 'html', label: 'HTML' },
   { value: 'css', label: 'CSS' },
   { value: 'json', label: 'JSON' },
@@ -26,7 +29,7 @@ const LANGUAGES = [
 
 const EXT = {
   javascript: 'js', typescript: 'ts', python: 'py', java: 'java',
-  cpp: 'cpp', html: 'html', css: 'css', json: 'json', markdown: 'md',
+  cpp: 'cpp', c: 'c', csharp: 'cs', php: 'php', html: 'html', css: 'css', json: 'json', markdown: 'md',
   rust: 'rs', go: 'go',
 };
 
@@ -36,6 +39,9 @@ const TEMPLATES = {
   python: 'print("Hello World")\n',
   java: 'class Main{\n  public static void main(String args[]){\n    System.out.println("Hello World");\n  }\n}\n',
   cpp: '#include<bits/stdc++.h>\nusing namespace std;\n\nint main(){\n  cout << "Hello World";\n  return 0;\n}\n',
+  c: '#include <stdio.h>\n\nint main() {\n  printf("Hello World\\n");\n  return 0;\n}\n',
+  csharp: 'using System;\n\nclass Program {\n  static void Main() {\n    Console.WriteLine("Hello World");\n  }\n}\n',
+  php: '<?php\n\necho "Hello World\\n";\n',
   html: '<!DOCTYPE html>\n<html>\n<head>\n  <meta charset="UTF-8">\n  <title>Live Preview</title>\n  <style>\n    body {\n      font-family: system-ui, sans-serif;\n      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);\n      min-height: 100vh;\n      display: flex;\n      align-items: center;\n      justify-content: center;\n      margin: 0;\n    }\n    .card {\n      background: white;\n      border-radius: 16px;\n      padding: 40px;\n      text-align: center;\n      box-shadow: 0 20px 60px rgba(0,0,0,0.3);\n    }\n    h1 { color: #764ba2; margin: 0 0 8px; }\n    p { color: #666; margin: 0; }\n  </style>\n</head>\n<body>\n  <div class="card">\n    <h1>Hello, SyncSpace! 🚀</h1>\n    <p>Start editing to see changes live.</p>\n  </div>\n\n  <script>\n    console.log("Preview loaded!");\n  </script>\n</body>\n</html>\n',
   css: 'body {\n  margin: 0;\n  padding: 0;\n}\n',
   json: '{\n  "key": "value"\n}\n',
@@ -388,33 +394,16 @@ export default function EditorPanel() {
 
     const startTime = Date.now();
     try {
-      // Map editor language to Piston API language
-      const langMap = {
-        javascript: 'javascript',
-        typescript: 'typescript',
-        python: 'python',
-        java: 'java',
-        cpp: 'c++',
-        rust: 'rust',
-        go: 'go'
-      };
-
-      const pistonLang = langMap[language];
-
-      if (!pistonLang) {
-        throw new Error(`Unsupported language for execution: ${language}`);
-      }
-
-      // Call Piston API
-      const response = await fetch('https://emkc.org/api/v2/piston/execute', {
+      // Call our backend execution API
+      const API_URL = import.meta.env.VITE_API_URL || (import.meta.env.PROD ? 'https://syncspace-backend-44cl.onrender.com/api/v1' : 'http://localhost:5005/api/v1');
+      const response = await fetch(`${API_URL}/execute`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json'
         },
         body: JSON.stringify({
-          language: pistonLang,
-          version: '*',
-          files: [{ content: val }]
+          language: language,
+          code: val
         })
       });
 
@@ -430,10 +419,10 @@ export default function EditorPanel() {
         newOutput.push('[COMPILE OUTPUT]');
         newOutput.push(...data.compile.output.split('\n'));
       }
-      if (data.run && data.run.output) {
-        if (data.run.stderr) {
-          newOutput.push(`Runtime Error:\n${data.run.stderr}`);
-        }
+      if (data.run && data.run.stderr) {
+        newOutput.push(`Runtime Error:\n${data.run.stderr}`);
+      }
+      if (data.run && data.run.stdout) {
         newOutput.push(...data.run.stdout.split('\n'));
       }
       
@@ -462,6 +451,7 @@ export default function EditorPanel() {
 
   // ── Render ─────────────────────────────────────────────────────────────
   const isHtml = language === 'html';
+  const isExecutable = ['javascript', 'typescript', 'python', 'java', 'c', 'cpp', 'csharp', 'php', 'go', 'rust'].includes(language);
 
   return (
     <div className="flex flex-col h-full bg-surface-950 overflow-hidden">
@@ -497,7 +487,7 @@ export default function EditorPanel() {
         </select>
 
         {/* Run button */}
-        {(language === 'javascript' || isHtml) && (
+        {(isExecutable || isHtml) && (
           <button
             onClick={isHtml ? handleRunHtml : handleRunCode}
             disabled={isRunning && !isHtml}
@@ -546,9 +536,11 @@ export default function EditorPanel() {
                 });
                 // Ctrl+Enter shortcut
                 editor.addCommand(monaco.KeyMod.CtrlCmd | monaco.KeyCode.Enter, () => {
-                  if (useEditorStore.getState().language === 'javascript') {
+                  const currentLang = useEditorStore.getState().language;
+                  const isExecutableLang = ['javascript', 'typescript', 'python', 'java', 'c', 'cpp', 'csharp', 'php', 'go', 'rust'].includes(currentLang);
+                  if (isExecutableLang) {
                     runCodeRef.current?.();
-                  } else if (useEditorStore.getState().language === 'html') {
+                  } else if (currentLang === 'html') {
                     handleRunHtml();
                   }
                 });
