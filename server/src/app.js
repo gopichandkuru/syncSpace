@@ -14,6 +14,7 @@ const chatRoutes = require('./routes/chat.routes');
 const replayRoutes = require('./routes/replay.routes');
 const documentRoutes = require('./routes/document.routes');
 const fileRoutes = require('./routes/file.routes');
+const executionRoutes = require('./routes/execution.routes');
 
 const app = express();
 
@@ -61,6 +62,7 @@ app.use('/api/v1/chat', chatRoutes);
 app.use('/api/v1/replay', replayRoutes);
 app.use('/api/v1/documents', documentRoutes);
 app.use('/api/v1/files', fileRoutes);
+app.use('/api/v1/execute', executionRoutes);
 
 app.use(notFound);
 app.use(errorHandler);
