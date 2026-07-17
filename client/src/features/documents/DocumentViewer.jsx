@@ -25,14 +25,14 @@ export default function DocumentViewer({ doc }) {
   // Lazy-load react-pdf so a pdfjs failure doesn't break the whole app
   useEffect(() => {
     let cancelled = false;
+    const workerSrc = new URL('pdfjs-dist/build/pdf.worker.min.mjs', import.meta.url).toString();
     import('react-pdf')
       .then((mod) => {
         if (cancelled) return;
         const { Document, Page, pdfjs } = mod;
-        // Use CDN worker to avoid Vite bundling issues with pdfjs-dist
-        if (!pdfjs.GlobalWorkerOptions.workerSrc) {
-          pdfjs.GlobalWorkerOptions.workerSrc = `https://cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjs.version}/pdf.worker.min.mjs`;
-        }
+        
+        pdfjs.GlobalWorkerOptions.workerSrc = workerSrc;
+        
         // Also import the CSS layers
         import('react-pdf/dist/Page/AnnotationLayer.css').catch(() => {});
         import('react-pdf/dist/Page/TextLayer.css').catch(() => {});
