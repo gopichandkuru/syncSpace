@@ -1,23 +1,7 @@
-# SyncSpace CODEOWNERS
-# This file dictates who is requested for review on Pull Requests.
+* @gopichandkuru @yashvi-gangani @kunalkt5656 @malathi1945 @bhagyasree31
 
-# Default owner for everything in the repo
-*       @gopichandkuru
+# Backend
+/server/ @gopichandkuru
 
-# Frontend Architecture and React Components
-/client/ @yashvi-gangani @gopichandkuru
-
-# Backend Architecture, Routes, Controllers
-/server/ @kunalkt5656 @gopichandkuru
-
-# Real-time Engine (Socket.io)
-/server/src/socket/ @bhagyasree31 @kunalkt5656
-
-# Database & Mongoose Models
-/server/src/models/ @malathi1945 @gopichandkuru
-
-# CI/CD and DevOps (Render configs)
-/render.yaml @gopichandkuru
-
-# Documentation
-/README.md @gopichandkuru @yashvi-gangani
+# Frontend
+/client/ @gopichandkuru @yashvi-gangani @kunalkt5656 @malathi1945 @bhagyasree31
