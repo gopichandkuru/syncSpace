@@ -395,7 +395,7 @@ export default function EditorPanel() {
     const startTime = Date.now();
     try {
       // Call our backend execution API
-      const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5005/api/v1';
+      const API_URL = import.meta.env.VITE_API_URL || (import.meta.env.PROD ? 'https://syncspace-backend-44cl.onrender.com/api/v1' : 'http://localhost:5005/api/v1');
       const response = await fetch(`${API_URL}/execute`, {
         method: 'POST',
         headers: {
@@ -451,6 +451,7 @@ export default function EditorPanel() {
 
   // ── Render ─────────────────────────────────────────────────────────────
   const isHtml = language === 'html';
+  const isExecutable = ['javascript', 'typescript', 'python', 'java', 'c', 'cpp', 'csharp', 'php', 'go', 'rust'].includes(language);
 
   return (
     <div className="flex flex-col h-full bg-surface-950 overflow-hidden">
@@ -486,7 +487,7 @@ export default function EditorPanel() {
         </select>
 
         {/* Run button */}
-        {(language === 'javascript' || isHtml) && (
+        {(isExecutable || isHtml) && (
           <button
             onClick={isHtml ? handleRunHtml : handleRunCode}
             disabled={isRunning && !isHtml}
@@ -535,9 +536,11 @@ export default function EditorPanel() {
                 });
                 // Ctrl+Enter shortcut
                 editor.addCommand(monaco.KeyMod.CtrlCmd | monaco.KeyCode.Enter, () => {
-                  if (useEditorStore.getState().language === 'javascript') {
+                  const currentLang = useEditorStore.getState().language;
+                  const isExecutableLang = ['javascript', 'typescript', 'python', 'java', 'c', 'cpp', 'csharp', 'php', 'go', 'rust'].includes(currentLang);
+                  if (isExecutableLang) {
                     runCodeRef.current?.();
-                  } else if (useEditorStore.getState().language === 'html') {
+                  } else if (currentLang === 'html') {
                     handleRunHtml();
                   }
                 });

@@ -64,7 +64,9 @@ exports.executeCode = async (req, res, next) => {
     console.error('Execution Error:', error.message || error);
     res.status(500).json({
       success: false,
-      message: 'Failed to execute code on server.'
+      message: 'Failed to execute code on server.',
+      error: error.message,
+      stack: error.stack
     });
   }
 };
