@@ -25,13 +25,12 @@ export default function DocumentViewer({ doc }) {
   // Lazy-load react-pdf so a pdfjs failure doesn't break the whole app
   useEffect(() => {
     let cancelled = false;
-    const workerSrc = new URL('pdfjs-dist/build/pdf.worker.min.mjs', import.meta.url).toString();
     import('react-pdf')
       .then((mod) => {
         if (cancelled) return;
         const { Document, Page, pdfjs } = mod;
         
-        pdfjs.GlobalWorkerOptions.workerSrc = workerSrc;
+        pdfjs.GlobalWorkerOptions.workerSrc = `//unpkg.com/pdfjs-dist@${pdfjs.version}/build/pdf.worker.min.mjs`;
         
         // Also import the CSS layers
         import('react-pdf/dist/Page/AnnotationLayer.css').catch(() => {});

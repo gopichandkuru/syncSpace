@@ -5,10 +5,10 @@ const AppError = require('../utils/AppError');
 const storage = multer.memoryStorage();
 
 const fileFilter = (_req, file, cb) => {
-  // Allow images, pdfs, common docs, text
   const allowed = [
     'image/jpeg', 'image/jpg', 'image/png', 'image/webp', 'image/gif',
     'application/pdf',
+    'application/x-pdf',
     'text/plain', 'text/markdown',
     'application/msword', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
     'application/vnd.ms-excel', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
@@ -18,8 +18,9 @@ const fileFilter = (_req, file, cb) => {
   if (allowed.includes(file.mimetype)) {
     cb(null, true);
   } else {
-    // Optionally allow all if needed, but let's restrict to common types
-    cb(null, true); // Actually, allow all for "File Sharing" feature to be generic.
+    // We want to be permissive but explicitly log unknown types
+    console.warn('Unknown mimetype uploaded:', file.mimetype);
+    cb(null, true); 
   }
 };
 

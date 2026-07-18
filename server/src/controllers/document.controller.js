@@ -18,7 +18,7 @@ exports.createDocument = catchAsync(async (req, res, next) => {
 
   // If a file is uploaded
   if (req.file) {
-    if (req.file.mimetype === 'application/pdf') {
+    if (req.file.mimetype === 'application/pdf' || req.file.originalname.toLowerCase().endsWith('.pdf')) {
       docType = 'pdf';
       // Use resource_type raw to prevent Cloudinary free tier restrictions on PDFs as images
       const result = await uploadToCloudinary(req.file.buffer, 'documents', { resource_type: 'raw' });

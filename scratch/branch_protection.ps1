@@ -1,0 +1,20 @@
+$repo = "gopichandkuru/syncSpace"
+$branch = "main"
+
+$payload = @{
+    required_status_checks = $null
+    enforce_admins = $true
+    required_pull_request_reviews = @{
+        dismiss_stale_reviews = $true
+        require_code_owner_reviews = $true
+        required_approving_review_count = 1
+    }
+    restrictions = $null
+    required_linear_history = $false
+    allow_force_pushes = $false
+    allow_deletions = $false
+}
+
+$jsonPayload = $payload | ConvertTo-Json -Depth 10
+
+$jsonPayload | gh api -X PUT "repos/$repo/branches/$branch/protection" --input -
