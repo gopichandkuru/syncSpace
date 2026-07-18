@@ -53,7 +53,12 @@ app.use(express.urlencoded({ extended: true, limit: '100mb' }));
 app.use(cookieParser());
 app.use(mongoSanitize());
 
-app.get('/health', (_req, res) => res.json({ status: 'ok', service: 'SyncSpace API', timestamp: new Date().toISOString() }));
+app.get('/health', (_req, res) => res.json({ 
+  status: 'ok', 
+  service: 'SyncSpace API', 
+  timestamp: new Date().toISOString(),
+  commit: process.env.RENDER_GIT_COMMIT || 'local'
+}));
 
 app.use('/api/v1/auth', authRoutes);
 app.use('/api/v1/users', userRoutes);

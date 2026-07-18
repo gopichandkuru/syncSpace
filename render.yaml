@@ -67,6 +67,8 @@ services:
         source: /*
         destination: /index.html
     envVars:
+      - key: NODE_VERSION
+        value: 20
       - key: VITE_API_URL
         value: https://syncspace-backend-44cl.onrender.com/api/v1
       - key: VITE_SOCKET_URL
