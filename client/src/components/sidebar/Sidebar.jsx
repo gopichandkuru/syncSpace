@@ -30,13 +30,23 @@ export default function Sidebar() {
   ];
 
   return (
-    <div
-      className={`sidebar flex-shrink-0 transition-all duration-300 ${sidebarOpen ? 'w-64' : 'w-20'}`}
-      style={{
-        backgroundColor: 'rgb(var(--surface-900))',
-        borderRight: '1px solid rgb(var(--surface-800))',
-      }}
-    >
+    <>
+      {/* Mobile Backdrop */}
+      {sidebarOpen && (
+        <div 
+          className="fixed inset-0 bg-black/50 z-40 md:hidden"
+          onClick={toggleSidebar}
+        />
+      )}
+      <div
+        className={`sidebar fixed md:relative z-50 flex-shrink-0 transition-all duration-300 ${
+          sidebarOpen ? 'translate-x-0 w-64' : '-translate-x-full md:translate-x-0 w-20'
+        }`}
+        style={{
+          backgroundColor: 'rgb(var(--surface-900))',
+          borderRight: '1px solid rgb(var(--surface-800))',
+        }}
+      >
       {/* Logo */}
       <div
         className="h-16 flex items-center justify-between px-4"
@@ -54,7 +64,7 @@ export default function Sidebar() {
         </Link>
         <button
           onClick={toggleSidebar}
-          className="p-2 rounded-lg hover:bg-primary-600/10 focus:outline-none transition-colors"
+          className="p-2 rounded-lg hover:bg-primary-600/10 focus:outline-none transition-colors hidden md:block"
           style={{ color: 'rgb(var(--text-muted))' }}
         >
           <TbMenu2 size={20} />
@@ -136,5 +146,6 @@ export default function Sidebar() {
         </button>
       </div>
     </div>
+    </>
   );
 }

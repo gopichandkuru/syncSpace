@@ -145,9 +145,17 @@ export default function CollaboratePage() {
       const container = containerRef.current;
       if (!container) return;
       const rect = container.getBoundingClientRect();
-      const clientX = e.touches ? e.touches[0].clientX : e.clientX;
-      const pct = ((clientX - rect.left) / rect.width) * 100;
-      setDividerX(Math.min(Math.max(pct, 25), 75));
+      const isMobile = window.innerWidth < 768;
+
+      if (isMobile) {
+        const clientY = e.touches ? e.touches[0].clientY : e.clientY;
+        const pct = ((clientY - rect.top) / rect.height) * 100;
+        setDividerX(Math.min(Math.max(pct, 20), 80));
+      } else {
+        const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+        const pct = ((clientX - rect.left) / rect.width) * 100;
+        setDividerX(Math.min(Math.max(pct, 20), 80));
+      }
     };
     const onUp = () => setDragging(false);
     window.addEventListener('mousemove', onMove);
@@ -301,7 +309,7 @@ export default function CollaboratePage() {
           <TbChevronLeft size={18} />
         </Link>
 
-        <span className="font-semibold text-sm truncate max-w-[200px]" style={{ color: 'rgb(var(--text-base))' }}>
+        <span className="font-semibold text-sm truncate max-w-[100px] sm:max-w-[200px]" style={{ color: 'rgb(var(--text-base))' }}>
           {currentRoom?.name}
         </span>
 
@@ -317,7 +325,7 @@ export default function CollaboratePage() {
         </div>
 
         {/* Layout toggles */}
-        <div className="flex items-center gap-0.5 bg-surface-800 rounded-lg p-0.5 border border-surface-700 ml-2">
+        <div className="flex items-center gap-0.5 bg-surface-800 rounded-lg p-0.5 border border-surface-700 ml-auto md:ml-2">
           <button
             onClick={() => setLayout('whiteboard')}
             title="Whiteboard only"
@@ -363,8 +371,8 @@ export default function CollaboratePage() {
         </div>
 
         {/* Online members */}
-        <div className="ml-auto flex items-center gap-2 relative group">
-          <div className="flex items-center gap-1 text-xs text-surface-400">
+        <div className="ml-2 md:ml-auto flex items-center gap-2 relative group">
+          <div className="hidden sm:flex items-center gap-1 text-xs text-surface-400">
             <TbUsers size={14} />
             <span>{onlineCount} online</span>
           </div>
@@ -419,7 +427,7 @@ export default function CollaboratePage() {
       </div>
 
       {/* ── Main Area ─────────────────────────────────────────────────── */}
-      <div className="flex flex-1 overflow-hidden relative" ref={containerRef}>
+      <div className="flex flex-col md:flex-row flex-1 overflow-hidden relative" ref={containerRef}>
         
         {/* Meeting Manager & Overlay — wrapped in error boundaries so they can never crash the page */}
         <FeatureBoundary name="MeetingManager">
@@ -442,7 +450,7 @@ export default function CollaboratePage() {
         {(layout === 'both' || layout === 'whiteboard') && (
           <div
             className="flex-shrink-0 overflow-hidden"
-            style={{ width: layout === 'both' ? `${dividerX}%` : '100%' }}
+            style={{ flexBasis: layout === 'both' ? `${dividerX}%` : '100%' }}
           >
             <WhiteboardPanel />
           </div>
@@ -453,10 +461,14 @@ export default function CollaboratePage() {
           <div
             onMouseDown={handleDividerMouseDown}
             onTouchStart={handleDividerMouseDown}
-            className={`flex-shrink-0 w-1.5 relative group cursor-col-resize hover:bg-primary-500/60 transition-colors ${dragging ? 'bg-primary-500/80' : 'bg-surface-800'}`}
+            className={`flex-shrink-0 relative group transition-colors 
+              h-1.5 w-full md:w-1.5 md:h-full 
+              cursor-row-resize md:cursor-col-resize 
+              hover:bg-primary-500/60 
+              ${dragging ? 'bg-primary-500/80' : 'bg-surface-800'}`}
           >
-            <div className="absolute inset-y-0 left-1/2 -translate-x-1/2 w-4 flex items-center justify-center">
-              <TbGripVertical size={16} className="text-surface-600 group-hover:text-primary-400 transition-colors" />
+            <div className="absolute left-1/2 -translate-x-1/2 top-1/2 -translate-y-1/2 md:inset-y-0 md:left-1/2 md:-translate-y-0 md:w-4 flex items-center justify-center">
+              <TbGripVertical size={16} className="text-surface-600 group-hover:text-primary-400 transition-colors rotate-90 md:rotate-0" />
             </div>
           </div>
         )}
@@ -464,8 +476,8 @@ export default function CollaboratePage() {
         {/* Editor or Document Panel */}
         {(layout === 'both' || layout === 'editor') && (
           <div
-            className="flex-1 overflow-hidden border-l border-surface-800"
-            style={{ width: layout === 'both' ? `${100 - dividerX}%` : '100%' }}
+            className="flex-1 overflow-hidden md:border-l border-t md:border-t-0 border-surface-800"
+            style={{ flexBasis: layout === 'both' ? `${100 - dividerX}%` : '100%' }}
           >
             {docId ? (
               <FeatureBoundary name="DocumentPanel">
@@ -479,7 +491,7 @@ export default function CollaboratePage() {
 
         {/* Chat Sidebar */}
         {chatOpen && (
-          <div className="flex-shrink-0 w-72 border-l border-surface-800 animate-slide-right">
+          <div className="absolute inset-y-0 right-0 w-[85vw] max-w-xs md:relative md:w-72 flex-shrink-0 z-50 border-l border-surface-800 animate-slide-right bg-surface-900 shadow-2xl md:shadow-none">
             <ChatPanel />
           </div>
         )}

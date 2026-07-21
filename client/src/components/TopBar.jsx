@@ -1,12 +1,12 @@
 import { useAuthStore } from '../store/authStore';
 import { useUIStore } from '../store/uiStore';
 import { useNotificationStore } from '../store/notificationStore';
-import { TbSun, TbMoon, TbBell, TbChevronRight } from 'react-icons/tb';
+import { TbSun, TbMoon, TbBell, TbChevronRight, TbMenu2 } from 'react-icons/tb';
 import { Link, useLocation } from 'react-router-dom';
 
 export default function TopBar() {
   const { user } = useAuthStore();
-  const { theme, toggleTheme, notificationsOpen, setNotificationsOpen } = useUIStore();
+  const { theme, toggleTheme, notificationsOpen, setNotificationsOpen, toggleSidebar } = useUIStore();
   const { unreadCount, notifications, markAllRead } = useNotificationStore();
   const location = useLocation();
 
@@ -38,16 +38,27 @@ export default function TopBar() {
 
   return (
     <header
-      className="h-16 px-6 flex items-center justify-between z-30 backdrop-blur-md"
+      className="h-auto min-h-[4rem] py-2 px-4 md:px-6 flex flex-col sm:flex-row sm:items-center justify-between z-30 backdrop-blur-md gap-3 sm:gap-0"
       style={{
         backgroundColor: 'rgb(var(--surface-900) / 0.8)',
         borderBottom: '1px solid rgb(var(--surface-800))',
         color: 'rgb(var(--text-base))',
       }}
     >
-      <div>{getBreadcrumbs()}</div>
+      <div>
+        {/* Mobile menu toggle */}
+        <div className="flex items-center gap-2 md:hidden mb-2 sm:mb-0">
+          <button
+            onClick={toggleSidebar}
+            className="p-1.5 rounded-lg text-surface-400 hover:text-white hover:bg-surface-800 transition-colors focus:outline-none"
+          >
+            <TbMenu2 size={22} />
+          </button>
+        </div>
+        {getBreadcrumbs()}
+      </div>
 
-      <div className="flex items-center gap-4">
+      <div className="flex items-center justify-end sm:justify-start gap-3 sm:gap-4 w-full sm:w-auto">
         {/* Theme Toggle */}
         <button
           onClick={toggleTheme}

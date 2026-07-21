@@ -60,9 +60,9 @@ export default function DashboardPage() {
   const activeRooms = myRooms.filter((r) => r.isActive).length;
 
   return (
-    <div className="p-6 max-w-7xl mx-auto space-y-8 animate-fade-in">
+    <div className="p-4 md:p-6 max-w-7xl mx-auto space-y-8 animate-fade-in">
       {/* Header */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
           <h1 className="text-3xl font-extrabold text-white">
             Welcome back, {user?.name?.split(' ')[0]} 👋
@@ -71,12 +71,12 @@ export default function DashboardPage() {
             Create or join collaborative real-time sync spaces.
           </p>
         </div>
-        <div className="flex items-center gap-3">
-          <button onClick={() => setJoinOpen(true)} className="btn-secondary">
+        <div className="flex flex-col xs:flex-row sm:items-center gap-3 w-full sm:w-auto">
+          <button onClick={() => setJoinOpen(true)} className="btn-secondary flex-1 sm:flex-none justify-center">
             <TbSearch size={18} />
             <span>Join Space</span>
           </button>
-          <button onClick={() => setCreateOpen(true)} className="btn-primary">
+          <button onClick={() => setCreateOpen(true)} className="btn-primary flex-1 sm:flex-none justify-center">
             <TbPlus size={18} />
             <span>Create Space</span>
           </button>
@@ -111,7 +111,7 @@ export default function DashboardPage() {
       )}
 
       {/* Stats bar */}
-      <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
         {[
           { icon: <TbCompass size={20} className="text-primary-400"/>, label: 'My Workspaces', value: loading ? '…' : myRooms.length },
           { icon: <TbUsers size={20} className="text-green-400"/>, label: 'Total Members', value: loading ? '…' : totalMembers },

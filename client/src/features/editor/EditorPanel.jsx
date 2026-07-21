@@ -457,7 +457,7 @@ export default function EditorPanel() {
     <div className="flex flex-col h-full bg-surface-950 overflow-hidden">
 
       {/* ── Toolbar ───────────────────────────────────────────────── */}
-      <div className="flex-shrink-0 h-12 bg-surface-900 border-b border-surface-800 px-3 flex items-center gap-2">
+      <div className="flex-shrink-0 min-h-[3rem] h-auto py-2 bg-surface-900 border-b border-surface-800 px-3 flex flex-wrap items-center gap-2">
         {/* Language */}
         <select
           value={language}
@@ -498,9 +498,9 @@ export default function EditorPanel() {
           </button>
         )}
 
-        <div className="ml-auto flex items-center gap-2">
+        <div className="ml-auto flex items-center gap-1 sm:gap-2 w-full sm:w-auto justify-end mt-2 sm:mt-0">
           {/* Save indicator */}
-          <span className={`text-xs transition-colors ${saveStatus === 'saving' ? 'text-yellow-400' : 'text-green-400'}`}>
+          <span className={`text-xs transition-colors mr-2 ${saveStatus === 'saving' ? 'text-yellow-400' : 'text-green-400'}`}>
             {saveStatus === 'saving' ? '● Saving…' : '✓ Saved'}
           </span>
 

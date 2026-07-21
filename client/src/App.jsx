@@ -10,21 +10,29 @@ import { authService } from './services/index';
 import MainLayout from './layouts/MainLayout';
 import AuthLayout from './layouts/AuthLayout';
 
-// Pages
-import LoginPage from './pages/auth/LoginPage';
-import RegisterPage from './pages/auth/RegisterPage';
-import ForgotPasswordPage from './pages/auth/ForgotPasswordPage';
-import ResetPasswordPage from './pages/auth/ResetPasswordPage';
-import VerifyEmailPage from './pages/auth/VerifyEmailPage';
-import DashboardPage from './pages/DashboardPage';
-import RoomPage from './pages/RoomPage';
-import CollaboratePage from './pages/CollaboratePage';
-import WhiteboardPage from './pages/WhiteboardPage';
-import EditorPage from './pages/EditorPage';
-import ProfilePage from './pages/ProfilePage';
-import InvitePage from './pages/InvitePage';
-import ReplayPage from './pages/ReplayPage';
-import NotFoundPage from './pages/NotFoundPage';
+import { lazy, Suspense } from 'react';
+
+// Pages - Lazy Loaded
+const LoginPage = lazy(() => import('./pages/auth/LoginPage'));
+const RegisterPage = lazy(() => import('./pages/auth/RegisterPage'));
+const ForgotPasswordPage = lazy(() => import('./pages/auth/ForgotPasswordPage'));
+const ResetPasswordPage = lazy(() => import('./pages/auth/ResetPasswordPage'));
+const VerifyEmailPage = lazy(() => import('./pages/auth/VerifyEmailPage'));
+const DashboardPage = lazy(() => import('./pages/DashboardPage'));
+const RoomPage = lazy(() => import('./pages/RoomPage'));
+const CollaboratePage = lazy(() => import('./pages/CollaboratePage'));
+const WhiteboardPage = lazy(() => import('./pages/WhiteboardPage'));
+const EditorPage = lazy(() => import('./pages/EditorPage'));
+const ProfilePage = lazy(() => import('./pages/ProfilePage'));
+const InvitePage = lazy(() => import('./pages/InvitePage'));
+const ReplayPage = lazy(() => import('./pages/ReplayPage'));
+const NotFoundPage = lazy(() => import('./pages/NotFoundPage'));
+
+const PageLoader = () => (
+  <div className="flex items-center justify-center h-screen" style={{ backgroundColor: 'rgb(var(--surface-950))' }}>
+    <div className="w-10 h-10 border-4 border-primary-600/30 border-t-primary-600 rounded-full animate-spin" />
+  </div>
+);
 
 function ProtectedRoute({ children }) {
   const { isAuthenticated } = useAuthStore();
@@ -70,34 +78,36 @@ export default function App() {
               error: { iconTheme: { primary: '#ef4444', secondary: '#fff' } },
             }}
           />
-          <Routes>
-            {/* Guest routes */}
-            <Route element={<GuestRoute><AuthLayout /></GuestRoute>}>
-              <Route path="/login" element={<LoginPage />} />
-              <Route path="/register" element={<RegisterPage />} />
-              <Route path="/forgot-password" element={<ForgotPasswordPage />} />
-              <Route path="/reset-password/:token" element={<ResetPasswordPage />} />
-            </Route>
+          <Suspense fallback={<PageLoader />}>
+            <Routes>
+              {/* Guest routes */}
+              <Route element={<GuestRoute><AuthLayout /></GuestRoute>}>
+                <Route path="/login" element={<LoginPage />} />
+                <Route path="/register" element={<RegisterPage />} />
+                <Route path="/forgot-password" element={<ForgotPasswordPage />} />
+                <Route path="/reset-password/:token" element={<ResetPasswordPage />} />
+              </Route>
 
-            {/* Email verify (accessible always) */}
-            <Route path="/verify-email/:token" element={<VerifyEmailPage />} />
-            <Route path="/invite/:token" element={<ProtectedRoute><InvitePage /></ProtectedRoute>} />
+              {/* Email verify (accessible always) */}
+              <Route path="/verify-email/:token" element={<VerifyEmailPage />} />
+              <Route path="/invite/:token" element={<ProtectedRoute><InvitePage /></ProtectedRoute>} />
 
-            {/* Protected routes */}
-            <Route element={<ProtectedRoute><MainLayout /></ProtectedRoute>}>
-              <Route path="/dashboard" element={<DashboardPage />} />
-              <Route path="/profile" element={<ProfilePage />} />
-              <Route path="/room/:slug" element={<RoomPage />} />
-              <Route path="/room/:slug/collaborate" element={<CollaboratePage />} />
-              <Route path="/room/:slug/whiteboard" element={<WhiteboardPage />} />
-              <Route path="/room/:slug/editor" element={<EditorPage />} />
-              <Route path="/room/:slug/replay/:sessionId" element={<ReplayPage />} />
-            </Route>
+              {/* Protected routes */}
+              <Route element={<ProtectedRoute><MainLayout /></ProtectedRoute>}>
+                <Route path="/dashboard" element={<DashboardPage />} />
+                <Route path="/profile" element={<ProfilePage />} />
+                <Route path="/room/:slug" element={<RoomPage />} />
+                <Route path="/room/:slug/collaborate" element={<CollaboratePage />} />
+                <Route path="/room/:slug/whiteboard" element={<WhiteboardPage />} />
+                <Route path="/room/:slug/editor" element={<EditorPage />} />
+                <Route path="/room/:slug/replay/:sessionId" element={<ReplayPage />} />
+              </Route>
 
-            {/* Root redirect */}
-            <Route path="/" element={<Navigate to="/dashboard" replace />} />
-            <Route path="*" element={<NotFoundPage />} />
-          </Routes>
+              {/* Root redirect */}
+              <Route path="/" element={<Navigate to="/dashboard" replace />} />
+              <Route path="*" element={<NotFoundPage />} />
+            </Routes>
+          </Suspense>
         </SocketProvider>
       </AppInitializer>
     </BrowserRouter>
